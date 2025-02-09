@@ -2,6 +2,13 @@
 
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -13,6 +20,11 @@ export function Navbar() {
   const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/auth')
+  }
+
+  // Get initials from email
+  const getInitials = (email: string) => {
+    return email.split('@')[0].substring(0, 2).toUpperCase()
   }
 
   return (
@@ -29,12 +41,23 @@ export function Navbar() {
                 <span className="text-sm text-gray-600">
                   {user.email}
                 </span>
-                <Button
-                  variant="outline"
-                  onClick={handleSignOut}
-                >
-                  Sign Out
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Avatar className="h-8 w-8 cursor-pointer">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {getInitials(user.email || '')}
+                      </AvatarFallback>
+                    </Avatar>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => router.push('/profile')}>
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             ) : (
               <Button
