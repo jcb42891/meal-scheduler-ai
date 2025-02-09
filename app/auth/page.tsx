@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,21 @@ export default function AuthPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Add session check on mount
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log('Initial session check:', session)
+      if (session) {
+        console.log('Session exists, redirecting to calendar')
+        router.replace('/calendar')
+      }
+    }
+    checkSession()
+  }, [router])
+
+  console.log('Auth page rendered', new Date().toISOString())
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,17 +54,27 @@ export default function AuthPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { error, data } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (error) {
-      setError(error.message)
-    } else {
-      router.push('/') // or wherever you want to redirect after login
+      if (error) {
+        setError(error.message)
+      } else {
+        // Create a cookie-based session
+        await supabase.auth.getSession()
+        
+        console.log('Sign in successful, attempting navigation')
+        router.replace('/calendar')
+      }
+    } catch (err) {
+      console.error('Sign in error:', err)
+      setError('An error occurred during sign in')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
