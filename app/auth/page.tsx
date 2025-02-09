@@ -20,6 +20,7 @@ export default function AuthPage() {
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [isResetting, setIsResetting] = useState(false)
+  const [activeTab, setActiveTab] = useState('signin')
 
   // Add session check on mount
   useEffect(() => {
@@ -41,17 +42,26 @@ export default function AuthPage() {
     setLoading(true)
     setError(null)
     
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      })
 
-    if (error) {
-      setError(error.message)
-    } else {
-      router.push('/') // or wherever you want to redirect after signup
+      if (error) {
+        setError(error.message)
+      } else {
+        toast.success('Check your email for the confirmation link')
+        setActiveTab('signin') // Switch back to sign in tab
+        setEmail('')
+        setPassword('')
+      }
+    } catch (err) {
+      console.error('Sign up error:', err)
+      toast.error('An error occurred during sign up')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -122,7 +132,7 @@ export default function AuthPage() {
             </p>
           </CardHeader>
           
-          <Tabs defaultValue="signin" className="w-full">
+          <Tabs defaultValue="signin" value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
