@@ -1,5 +1,6 @@
 import React from 'react'
 import { AuthProvider } from '@/lib/contexts/AuthContext'
+import { Navbar } from '@/components/navbar'
 
 export default function RootLayout({
   children,
@@ -10,7 +11,10 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AuthProvider>
-          {children}
+          <Navbar />
+          <main>
+            {children}
+          </main>
         </AuthProvider>
       </body>
     </html>
