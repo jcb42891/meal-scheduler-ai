@@ -1,57 +1,48 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export function Navbar() {
+  const { user } = useAuth()
   const router = useRouter()
-  const [userEmail, setUserEmail] = useState<string | null>(null)
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setUserEmail(session?.user?.email ?? null)
-    }
-    
-    getUser()
-
-    // Set up realtime subscription for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUserEmail(session?.user?.email ?? null)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const handleLogout = async () => {
+  const handleSignOut = async () => {
     await supabase.auth.signOut()
     router.push('/auth')
   }
 
   return (
-    <nav className="border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
-          <div className="flex items-center">
-            <Link href="/calendar" className="text-lg font-semibold">
-              Meal Planner
-            </Link>
-          </div>
-
+    <nav className="border-b bg-white shadow-sm">
+      <div className="container mx-auto px-4">
+        <div className="flex h-16 items-center justify-between">
+          <Link href="/" className="text-xl font-semibold text-gray-800">
+            Meal Planner
+          </Link>
+          
           <div className="flex items-center gap-4">
-            {userEmail && (
+            {user ? (
               <>
-                <span className="text-sm text-gray-500">{userEmail}</span>
+                <span className="text-sm text-gray-600">
+                  {user.email}
+                </span>
                 <Button
                   variant="outline"
-                  onClick={handleLogout}
+                  onClick={handleSignOut}
                 >
-                  Logout
+                  Sign Out
                 </Button>
               </>
+            ) : (
+              <Button
+                variant="default"
+                onClick={() => router.push('/auth')}
+              >
+                Sign In
+              </Button>
             )}
           </div>
         </div>

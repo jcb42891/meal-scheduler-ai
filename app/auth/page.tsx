@@ -78,58 +78,65 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <Card className="w-[400px]">
-        <Tabs defaultValue="signin">
+    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <h2 className="text-2xl font-bold text-center">Welcome</h2>
+          <p className="text-sm text-muted-foreground text-center">
+            Sign in to your account to continue
+          </p>
+        </CardHeader>
+        
+        <Tabs defaultValue="signin" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Sign In</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
           
-          <CardContent className="pt-4">
-            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+          <CardContent className="pt-6">
+            {error && (
+              <div className="mb-4 rounded-lg bg-destructive/15 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
             
             <TabsContent value="signin">
-              <form onSubmit={handleSignIn}>
-                <div className="space-y-4">
-                  <Input
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Loading...' : 'Sign In'}
-                  </Button>
-                </div>
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Loading...' : 'Sign In'}
+                </Button>
               </form>
             </TabsContent>
 
             <TabsContent value="signup">
-              <form onSubmit={handleSignUp}>
-                <div className="space-y-4">
-                  <Input
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Loading...' : 'Sign Up'}
-                  </Button>
-                </div>
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Loading...' : 'Sign Up'}
+                </Button>
               </form>
             </TabsContent>
           </CardContent>
