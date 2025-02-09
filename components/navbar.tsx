@@ -10,12 +10,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 
 export function Navbar() {
   const { user } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -27,13 +29,36 @@ export function Navbar() {
     return email.split('@')[0].substring(0, 2).toUpperCase()
   }
 
+  const NavLink = ({ href, children }: { href: string; children: React.ReactNode }) => {
+    const isActive = pathname === href
+    return (
+      <Link
+        href={href}
+        className={cn(
+          "text-sm font-medium transition-colors hover:text-primary",
+          isActive ? "text-foreground" : "text-muted-foreground"
+        )}
+      >
+        {children}
+      </Link>
+    )
+  }
+
   return (
     <nav className="border-b bg-white shadow-sm">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="text-xl font-semibold text-gray-800">
-            Meal Planner
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/" className="text-xl font-semibold text-gray-800">
+              Meal Planner
+            </Link>
+            {user && (
+              <div className="flex gap-4">
+                <NavLink href="/calendar">Calendar</NavLink>
+                <NavLink href="/groups">Groups</NavLink>
+              </div>
+            )}
+          </div>
           
           <div className="flex items-center gap-4">
             {user ? (
