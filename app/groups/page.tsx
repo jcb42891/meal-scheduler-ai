@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
 type Group = {
   id: string
@@ -26,6 +27,8 @@ export default function GroupsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  const [groupToDelete, setGroupToDelete] = useState<Group | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -124,6 +127,29 @@ export default function GroupsPage() {
     }
   }
 
+  const handleDeleteGroup = async () => {
+    if (!groupToDelete) return
+
+    setIsDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('groups')
+        .delete()
+        .eq('id', groupToDelete.id)
+
+      if (error) throw error
+
+      toast.success('Group deleted successfully')
+      fetchGroups() // Refresh the list
+    } catch (error) {
+      console.error('Error deleting group:', error)
+      toast.error('Failed to delete group')
+    } finally {
+      setIsDeleting(false)
+      setGroupToDelete(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -149,6 +175,16 @@ export default function GroupsPage() {
             <Card key={group.id}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <h2 className="text-xl font-semibold">{group.name}</h2>
+                {group.owner_id === user?.id && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setGroupToDelete(group)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
                 <div className="flex justify-end space-x-2">
@@ -203,6 +239,31 @@ export default function GroupsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog 
+        open={groupToDelete !== null} 
+        onOpenChange={(open) => !open && setGroupToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the group "{groupToDelete?.name}" and all associated data.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteGroup}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Group'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 } 
