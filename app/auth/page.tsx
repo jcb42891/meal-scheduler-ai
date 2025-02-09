@@ -43,19 +43,35 @@ export default function AuthPage() {
     setError(null)
     
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
-        password,
+        password
       })
 
-      if (error) {
-        setError(error.message)
-      } else {
-        toast.success('Check your email for the confirmation link')
-        setActiveTab('signin') // Switch back to sign in tab
-        setEmail('')
-        setPassword('')
+      console.log('Sign up response:', { authData, authError })
+
+      if (authError) {
+        setError(authError.message)
+        return
       }
+
+      if (authData.user) {
+        // Manually create profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            { id: authData.user.id, email: authData.user.email }
+          ])
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError)
+        }
+      }
+
+      toast.success('Check your email for the confirmation link')
+      setActiveTab('signin')
+      setEmail('')
+      setPassword('')
     } catch (err) {
       console.error('Sign up error:', err)
       toast.error('An error occurred during sign up')
@@ -76,17 +92,16 @@ export default function AuthPage() {
       })
 
       if (error) {
+        console.error('Sign in error details:', error)
         setError(error.message)
-      } else {
-        // Create a cookie-based session
-        await supabase.auth.getSession()
-        
-        console.log('Sign in successful, attempting navigation')
-        router.replace('/calendar')
+        return
       }
+
+      console.log('Sign in successful:', data)
+      router.replace('/calendar')
     } catch (err) {
       console.error('Sign in error:', err)
-      setError('An error occurred during sign in')
+      setError('An unexpected error occurred')
     } finally {
       setLoading(false)
     }
