@@ -7,6 +7,7 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
+import { toast } from 'sonner'
 
 type Profile = {
   first_name: string | null
@@ -19,6 +20,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile>({ first_name: '', last_name: '' })
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -73,6 +75,29 @@ export default function ProfilePage() {
     }
   }
 
+  const handleResetPassword = async () => {
+    if (!user?.email) return
+
+    setIsResetting(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      })
+
+      if (error) {
+        toast.error('Failed to send reset email')
+        console.error('Reset password error:', error)
+      } else {
+        toast.success('Password reset email sent')
+      }
+    } catch (err) {
+      console.error('Error:', err)
+      toast.error('An error occurred')
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -82,11 +107,25 @@ export default function ProfilePage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <h2 className="text-xl font-semibold">Account Details</h2>
-          {!isEditing && (
-            <Button variant="outline" onClick={() => setIsEditing(true)}>
-              Edit Profile
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {!isEditing && (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={handleResetPassword}
+                  disabled={isResetting}
+                >
+                  {isResetting ? 'Sending...' : 'Reset Password'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsEditing(true)}
+                >
+                  Edit Profile
+                </Button>
+              </>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>

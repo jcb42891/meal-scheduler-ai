@@ -2,6 +2,7 @@ import React from 'react'
 import { AuthProvider } from '@/lib/contexts/AuthContext'
 import { Navbar } from '@/components/navbar'
 import './globals.css'
+import { Toaster } from 'sonner'
 
 export default function RootLayout({
   children,
@@ -18,6 +19,7 @@ export default function RootLayout({
               {children}
             </main>
           </div>
+          <Toaster />
         </AuthProvider>
       </body>
     </html>
