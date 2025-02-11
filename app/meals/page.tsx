@@ -8,6 +8,17 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { CreateMealDialog } from './create-meal-dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Trash2 } from 'lucide-react'
 
 type Meal = {
   id: string
@@ -25,6 +36,8 @@ export default function MealsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [userGroups, setUserGroups] = useState<{ id: string; name: string }[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState<string>('')
+  const [mealToDelete, setMealToDelete] = useState<Meal | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -95,6 +108,29 @@ export default function MealsPage() {
     setLoading(false)
   }
 
+  const handleDeleteMeal = async () => {
+    if (!mealToDelete) return
+    
+    setIsDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('meals')
+        .delete()
+        .eq('id', mealToDelete.id)
+
+      if (error) throw error
+
+      toast.success('Meal deleted successfully')
+      fetchMeals()
+    } catch (error) {
+      console.error('Error deleting meal:', error)
+      toast.error('Failed to delete meal')
+    } finally {
+      setIsDeleting(false)
+      setMealToDelete(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -143,6 +179,14 @@ export default function MealsPage() {
                       Category: {meal.category}
                     </span>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setMealToDelete(meal)}
+                    className="text-destructive hover:text-destructive/90"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               ))}
             </div>
@@ -156,6 +200,28 @@ export default function MealsPage() {
         groupId={selectedGroupId}
         onMealCreated={fetchMeals}
       />
+
+      <AlertDialog open={!!mealToDelete} onOpenChange={(open) => !open && setMealToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the meal "{mealToDelete?.name}".
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteMeal}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 } 
