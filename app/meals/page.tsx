@@ -18,7 +18,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Trash2 } from 'lucide-react'
+import { Trash2, Pencil } from 'lucide-react'
+import { EditMealDialog } from './edit-meal-dialog'
 
 type Meal = {
   id: string
@@ -38,6 +39,7 @@ export default function MealsPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>('')
   const [mealToDelete, setMealToDelete] = useState<Meal | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [mealToEdit, setMealToEdit] = useState<Meal | null>(null)
 
   useEffect(() => {
     if (!user) {
@@ -179,14 +181,24 @@ export default function MealsPage() {
                       Category: {meal.category}
                     </span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setMealToDelete(meal)}
-                    className="text-destructive hover:text-destructive/90"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setMealToEdit(meal)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setMealToDelete(meal)}
+                      className="text-destructive hover:text-destructive/90"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -199,6 +211,13 @@ export default function MealsPage() {
         onOpenChange={setShowCreateDialog}
         groupId={selectedGroupId}
         onMealCreated={fetchMeals}
+      />
+
+      <EditMealDialog
+        open={!!mealToEdit}
+        onOpenChange={(open) => !open && setMealToEdit(null)}
+        meal={mealToEdit}
+        onMealUpdated={fetchMeals}
       />
 
       <AlertDialog open={!!mealToDelete} onOpenChange={(open) => !open && setMealToDelete(null)}>

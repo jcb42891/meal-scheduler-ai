@@ -8,13 +8,13 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { useAuth } from '@/lib/contexts/AuthContext'
 
-type Props = {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  groupId: string
-  onMealCreated: () => void
+type Meal = {
+  id: string
+  name: string
+  description: string
+  category: string
+  group_id: string
 }
 
 type Ingredient = {
@@ -28,44 +28,154 @@ type MealIngredient = {
   unit: string
 }
 
-export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }: Props) {
-  const { user } = useAuth()
+// Add this type to match Supabase's response
+type MealIngredientResponse = {
+  quantity: number
+  unit: string
+  ingredient: {
+    id: string
+    name: string
+  }[]
+}
+type Props = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  meal: Meal | null
+  onMealUpdated: () => void
+}
+
+export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Props) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [selectedIngredients, setSelectedIngredients] = useState<MealIngredient[]>([])
-  const [newIngredient, setNewIngredient] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [isLoadingIngredients, setIsLoadingIngredients] = useState(true)
+
+  // Load meal data when opened
+  useEffect(() => {
+    if (meal) {
+      setName(meal.name)
+      setDescription(meal.description || '')
+      setCategory(meal.category || '')
+      fetchMealIngredients()
+    }
+  }, [meal])
+
+  // Fetch ingredients for the meal
+  const fetchMealIngredients = async () => {
+    if (!meal) return
+
+    type DBIngredient = {
+      quantity: number
+      unit: string
+      ingredient: { id: string; name: string }
+    }
+
+    const { data, error } = await supabase
+      .from('meal_ingredients')
+      .select(`
+        quantity,
+        unit,
+        ingredient:ingredients(id, name)
+      `)
+      .eq('meal_id', meal.id)
+      .returns<DBIngredient[]>()
+
+    if (!error && data) {
+      const validIngredients = data.map(item => ({
+        ingredient: item.ingredient,
+        quantity: item.quantity,
+        unit: item.unit
+      }))
+      setSelectedIngredients(validIngredients)
+    }
+  }
+
+  // Load available ingredients
+  useEffect(() => {
+    const fetchIngredients = async () => {
+      setIsLoadingIngredients(true)
+      try {
+        const { data, error } = await supabase
+          .from('ingredients')
+          .select('*')
+          .order('name')
+
+        if (!error) {
+          setIngredients(data || [])
+        }
+      } finally {
+        setIsLoadingIngredients(false)
+      }
+    }
+
+    fetchIngredients()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user || !groupId) return
+    if (!meal) return
 
     setIsSubmitting(true)
     try {
-      // Create meal
-      const { data: meal, error: mealError } = await supabase
+      // Update meal
+      const { data: updatedMeal, error: mealError } = await supabase
         .from('meals')
-        .insert({
+        .update({
           name,
           description,
-          category,
-          group_id: groupId,
-          created_by: user.id
+          category
         })
+        .eq('id', meal.id)
         .select()
-        .single()
 
-      if (mealError) throw mealError
+      if (mealError) {
+        console.error('Error updating meal details:', mealError)
+        throw mealError
+      }
 
-      // Add ingredients
-      if (selectedIngredients.length > 0) {
-        const { error: ingredientsError } = await supabase
+      console.log('Updated meal:', updatedMeal)
+
+      // Get current ingredients
+      const { data: currentIngredients } = await supabase
+        .from('meal_ingredients')
+        .select('ingredient_id, quantity, unit')
+        .eq('meal_id', meal.id)
+
+      // Determine which ingredients to update, add, or remove
+      const toUpdate = selectedIngredients.filter(item => 
+        currentIngredients?.some(ci => ci.ingredient_id === item.ingredient.id)
+      )
+      const toAdd = selectedIngredients.filter(item => 
+        !currentIngredients?.some(ci => ci.ingredient_id === item.ingredient.id)
+      )
+      const toDelete = currentIngredients?.filter(ci => 
+        !selectedIngredients.some(si => si.ingredient.id === ci.ingredient_id)
+      ) || []
+
+      // Update existing ingredients
+      for (const item of toUpdate) {
+        const { error } = await supabase
+          .from('meal_ingredients')
+          .update({
+            quantity: item.quantity,
+            unit: item.unit
+          })
+          .eq('meal_id', meal.id)
+          .eq('ingredient_id', item.ingredient.id)
+
+        if (error) throw error
+      }
+
+      // Add new ingredients
+      if (toAdd.length > 0) {
+        const { error } = await supabase
           .from('meal_ingredients')
           .insert(
-            selectedIngredients.map(item => ({
+            toAdd.map(item => ({
               meal_id: meal.id,
               ingredient_id: item.ingredient.id,
               quantity: item.quantity,
@@ -73,45 +183,36 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
             }))
           )
 
-        if (ingredientsError) throw ingredientsError
+        if (error) throw error
       }
 
-      toast.success('Meal created successfully')
-      onMealCreated()
+      // Delete removed ingredients
+      if (toDelete.length > 0) {
+        const { error } = await supabase
+          .from('meal_ingredients')
+          .delete()
+          .eq('meal_id', meal.id)
+          .in('ingredient_id', toDelete.map(i => i.ingredient_id))
+
+        if (error) throw error
+      }
+
+      toast.success('Meal updated successfully')
+      onMealUpdated()
       onOpenChange(false)
-      // Reset form
-      setName('')
-      setDescription('')
-      setCategory('')
-      setSelectedIngredients([])
     } catch (error) {
-      console.error('Error creating meal:', error)
-      toast.error('Failed to create meal')
+      console.error('Error updating meal:', error)
+      toast.error('Failed to update meal')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  useEffect(() => {
-    const fetchIngredients = async () => {
-      const { data, error } = await supabase
-        .from('ingredients')
-        .select('*')
-        .order('name')
-
-      if (!error) {
-        setIngredients(data)
-      }
-    }
-
-    fetchIngredients()
-  }, [])
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create New Meal</DialogTitle>
+          <DialogTitle>Edit Meal</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
@@ -156,8 +257,8 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
                   list="ingredients-list"
                 />
                 <datalist id="ingredients-list">
-                  {ingredients
-                    .filter(i => !selectedIngredients.some(si => si.ingredient.id === i.id))
+                  {!isLoadingIngredients && ingredients
+                    .filter(i => !selectedIngredients?.some(si => si?.ingredient?.id === i?.id))
                     .map(ingredient => (
                       <option key={ingredient.id} value={ingredient.name} />
                     ))}
@@ -202,18 +303,18 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
             </div>
 
             <div className="space-y-2">
-              {selectedIngredients.map((item, index) => (
-                <div key={item.ingredient.id} className="flex items-center gap-2 p-2 border rounded">
-                  <span className="flex-1 font-medium">{item.ingredient.name}</span>
+              {selectedIngredients?.length > 0 && selectedIngredients.map((item, index) => (
+                <div key={item?.ingredient?.id || index} className="flex items-center gap-2 p-2 border rounded">
+                  <span className="flex-1 font-medium">{item?.ingredient?.name}</span>
                   <div className="flex items-center gap-2">
                     <div className="flex flex-col">
-                      <Label htmlFor={`quantity-${item.ingredient.id}`} className="text-xs">
+                      <Label htmlFor={`quantity-${item?.ingredient?.id}`} className="text-xs">
                         Quantity
                       </Label>
                       <Input
-                        id={`quantity-${item.ingredient.id}`}
+                        id={`quantity-${item?.ingredient?.id}`}
                         type="number"
-                        value={item.quantity}
+                        value={item?.quantity}
                         onChange={(e) => {
                           const newIngredients = [...selectedIngredients]
                           newIngredients[index].quantity = parseFloat(e.target.value) || 0
@@ -225,12 +326,12 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
                       />
                     </div>
                     <div className="flex flex-col">
-                      <Label htmlFor={`unit-${item.ingredient.id}`} className="text-xs">
+                      <Label htmlFor={`unit-${item?.ingredient?.id}`} className="text-xs">
                         Unit
                       </Label>
                       <select
-                        id={`unit-${item.ingredient.id}`}
-                        value={item.unit}
+                        id={`unit-${item?.ingredient?.id}`}
+                        value={item?.unit}
                         onChange={(e) => {
                           const newIngredients = [...selectedIngredients]
                           newIngredients[index].unit = e.target.value
@@ -277,7 +378,7 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Meal'}
+              {isSubmitting ? 'Updating...' : 'Update Meal'}
             </Button>
           </div>
         </form>
