@@ -56,6 +56,7 @@ export function Navbar() {
               <div className="flex gap-4">
                 <NavLink href="/calendar">Calendar</NavLink>
                 <NavLink href="/groups">Groups</NavLink>
+                <NavLink href="/meals">Meals</NavLink>
               </div>
             )}
           </div>
