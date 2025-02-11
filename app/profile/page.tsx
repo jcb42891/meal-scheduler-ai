@@ -21,6 +21,9 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
 
   useEffect(() => {
     if (!user) {
@@ -38,6 +41,8 @@ export default function ProfilePage() {
 
       if (data) {
         setProfile(data)
+        setFirstName(data.first_name || '')
+        setLastName(data.last_name || '')
       }
     }
 
@@ -98,6 +103,42 @@ export default function ProfilePage() {
     }
   }
 
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsUpdating(true)
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: firstName,
+          last_name: lastName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user?.id)
+
+      if (error) {
+        console.error('Update error:', error)
+        throw error
+      }
+
+      // Update local profile state
+      setProfile({
+        ...profile,
+        first_name: firstName,
+        last_name: lastName
+      })
+      
+      toast.success('Profile updated successfully')
+      setIsEditing(false) // Exit edit mode
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      toast.error('Failed to update profile')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -138,8 +179,8 @@ export default function ProfilePage() {
               <label className="text-sm font-medium text-gray-500">First Name</label>
               {isEditing ? (
                 <Input
-                  value={profile.first_name || ''}
-                  onChange={(e) => setProfile({ ...profile, first_name: e.target.value })}
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
                   className="mt-1"
                 />
               ) : (
@@ -151,8 +192,8 @@ export default function ProfilePage() {
               <label className="text-sm font-medium text-gray-500">Last Name</label>
               {isEditing ? (
                 <Input
-                  value={profile.last_name || ''}
-                  onChange={(e) => setProfile({ ...profile, last_name: e.target.value })}
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
                   className="mt-1"
                 />
               ) : (
@@ -165,8 +206,8 @@ export default function ProfilePage() {
                 <Button variant="outline" onClick={() => setIsEditing(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? 'Saving...' : 'Save Changes'}
+                <Button onClick={handleUpdateProfile} disabled={isUpdating}>
+                  {isUpdating ? 'Updating...' : 'Update Profile'}
                 </Button>
               </div>
             )}
