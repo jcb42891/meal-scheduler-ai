@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 type Invitation = {
   id: string
@@ -18,6 +19,7 @@ type Invitation = {
 type Group = {
   id: string
   name: string
+  owner_id: string
 }
 
 type Profile = {
@@ -37,6 +39,9 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [members, setMembers] = useState<MemberWithProfile[]>([])
+  const [isOwner, setIsOwner] = useState(false)
+  const [isLeaving, setIsLeaving] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     fetchGroup()
@@ -44,10 +49,16 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
     fetchMembers()
   }, [groupId])
 
+  useEffect(() => {
+    if (group && user) {
+      setIsOwner(group.owner_id === user.id)
+    }
+  }, [group, user])
+
   const fetchGroup = async () => {
     const { data, error } = await supabase
       .from('groups')
-      .select('id, name')
+      .select('id, name, owner_id')
       .eq('id', groupId)
       .single()
 
@@ -171,12 +182,61 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
     }
   }
 
+  const handleLeaveGroup = async () => {
+    if (!user || isOwner) return
+    
+    setIsLeaving(true)
+    try {
+      // Check if user is the last member
+      const { count } = await supabase
+        .from('group_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('group_id', groupId)
+
+      if (count === 1) {
+        toast.error('You cannot leave the group as you are the last member')
+        return
+      }
+
+      // Remove user from group
+      const { error } = await supabase
+        .from('group_members')
+        .delete()
+        .match({
+          group_id: groupId,
+          user_id: user.id
+        })
+
+      if (error) {
+        console.error('Delete error:', error)
+        throw error
+      }
+
+      toast.success('Successfully left the group')
+      router.push('/groups')
+    } catch (error) {
+      console.error('Error leaving group:', error)
+      toast.error('Failed to leave group')
+    } finally {
+      setIsLeaving(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">
           {group?.name || 'Loading...'}
         </h1>
+        {!isOwner && (
+          <Button 
+            variant="destructive" 
+            onClick={handleLeaveGroup}
+            disabled={isLeaving}
+          >
+            {isLeaving ? 'Leaving...' : 'Leave Group'}
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -236,11 +296,11 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
 
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold">Pending Invitations</h2>
+          <h2 className="text-xl font-semibold">Past Invitations</h2>
         </CardHeader>
         <CardContent>
           {invitations.length === 0 ? (
-            <p className="text-muted-foreground">No pending invitations</p>
+            <p className="text-muted-foreground">No past invitations</p>
           ) : (
             <div className="space-y-4">
               {invitations.map((invite) => (

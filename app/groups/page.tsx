@@ -41,32 +41,38 @@ export default function GroupsPage() {
 
   const fetchGroups = async () => {
     try {
-      // First get user's group memberships
-      const { data: memberships, error: membershipError } = await supabase
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // First get the groups where user is a member
+      const { data: memberGroups } = await supabase
         .from('group_members')
         .select('group_id')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
 
-      if (membershipError) throw membershipError
+      // Get all groups where user is owner or member
+      const { data, error } = await supabase
+        .from('groups')
+        .select('*')
+        .or(`owner_id.eq.${user.id},id.in.(${memberGroups?.map(g => g.group_id).join(',') || ''})`)
+        .order('created_at', { ascending: false })
 
-      if (!memberships?.length) {
+      if (error) {
+        console.error('Error fetching groups:', error)
+        toast.error('Failed to load groups')
+        return
+      }
+
+      // Handle empty case
+      if (!data || data.length === 0) {
         setGroups([])
         return
       }
 
-      // Then fetch the actual groups
-      const groupIds = memberships.map(m => m.group_id)
-      const { data: groupsData, error: groupsError } = await supabase
-        .from('groups')
-        .select('*')
-        .in('id', groupIds)
-
-      if (groupsError) throw groupsError
-
-      setGroups(groupsData || [])
+      setGroups(data)
     } catch (error) {
-      console.error('Error fetching groups:', error)
-      toast.error('Failed to load groups')
+      console.error('Error:', error)
+      toast.error('An error occurred')
     } finally {
       setLoading(false)
     }
