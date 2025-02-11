@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
 
 type Meal = {
   id: string
@@ -226,13 +228,24 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
-            <Input
-              id="category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g., Vegetarian, Chicken, Beef"
-            />
+          <Label>Category</Label>
+            <div className="flex gap-2">
+              {Object.values(MEAL_CATEGORIES).map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategory(cat)}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-sm font-medium',
+                    category === cat 
+                      ? getCategoryColor(cat as MealCategory)
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -314,10 +327,10 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                       <Input
                         id={`quantity-${item?.ingredient?.id}`}
                         type="number"
-                        value={item?.quantity}
+                        value={item?.quantity || ''}
                         onChange={(e) => {
                           const newIngredients = [...selectedIngredients]
-                          newIngredients[index].quantity = parseFloat(e.target.value) || 0
+                          newIngredients[index].quantity = e.target.value === '' ? 0 : parseFloat(e.target.value)
                           setSelectedIngredients(newIngredients)
                         }}
                         className="w-20"

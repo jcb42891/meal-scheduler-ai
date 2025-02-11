@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Trash2, Pencil } from 'lucide-react'
 import { EditMealDialog } from './edit-meal-dialog'
+import { cn } from '@/lib/utils'
+import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
 
 type Meal = {
   id: string
@@ -177,9 +179,14 @@ export default function MealsPage() {
                     <p className="text-sm text-muted-foreground">
                       {meal.description}
                     </p>
-                    <span className="text-sm text-muted-foreground">
-                      Category: {meal.category}
-                    </span>
+                    {meal.category && (
+                      <span className={cn(
+                        'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium',
+                        getCategoryColor(meal.category as MealCategory)
+                      )}>
+                        {meal.category}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
