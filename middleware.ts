@@ -20,9 +20,18 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/calendar', req.url))
   }
 
+  // If accessing the password update page, check for hash fragment
+  if (req.nextUrl.pathname === '/auth/update-password') {
+    return res
+  }
+
   return res
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/auth/update-password',
+    '/groups/:path*',
+    '/calendar/:path*'
+  ]
 } 
