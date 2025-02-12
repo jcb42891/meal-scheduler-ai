@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, PlusCircle, Trash2 } from 'lucide-react'
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -120,6 +120,26 @@ export default function CalendarPage() {
   const previousMonth = () => setCurrentDate(subMonths(currentDate, 1))
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1))
 
+  const deleteMeal = async (dateStr: string) => {
+    if (!selectedGroupId) return
+
+    try {
+      const { error } = await supabase
+        .from('meal_calendar')
+        .delete()
+        .eq('group_id', selectedGroupId)
+        .eq('date', dateStr)
+
+      if (error) throw error
+
+      toast.success('Meal removed')
+      fetchCalendarMeals()
+    } catch (error) {
+      console.error('Error removing meal:', error)
+      toast.error('Failed to remove meal')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -181,18 +201,29 @@ export default function CalendarPage() {
                     <time dateTime={dateStr}>
                       {format(day, 'd')}
                     </time>
-                    {!meal && isSameMonth(day, currentDate) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => {
-                          setSelectedDate(day)
-                          setShowAddMeal(true)
-                        }}
-                      >
-                        <PlusCircle className="h-4 w-4" />
-                      </Button>
+                    {isSameMonth(day, currentDate) && (
+                      meal ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-red-600 hover:text-red-700"
+                          onClick={() => deleteMeal(dateStr)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => {
+                            setSelectedDate(day)
+                            setShowAddMeal(true)
+                          }}
+                        >
+                          <PlusCircle className="h-4 w-4" />
+                        </Button>
+                      )
                     )}
                   </div>
                   {meal && (
