@@ -18,6 +18,14 @@ type GroupMember = {
   }
 }
 
+type MealCalendarResponse = {
+  date: string
+  meal: {
+    id: string
+    name: string
+  }
+}
+
 export default function CalendarPage() {
   const { user } = useAuth()
   const router = useRouter()
@@ -48,6 +56,7 @@ export default function CalendarPage() {
       .from('groups')
       .select('id, name')
       .eq('owner_id', user?.id)
+      .returns<{ id: string; name: string }[]>()
 
     if (ownedError) {
       console.error('Error fetching owned groups:', ownedError)
@@ -100,6 +109,7 @@ export default function CalendarPage() {
       .eq('group_id', selectedGroupId)
       .gte('date', startDate.toISOString())
       .lte('date', endDate.toISOString())
+      .returns<MealCalendarResponse[]>()
 
     if (error) {
       toast.error('Failed to load calendar meals')
