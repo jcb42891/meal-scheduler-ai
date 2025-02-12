@@ -2,11 +2,13 @@
 
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { supabase } from '@/lib/supabase'
@@ -45,49 +47,69 @@ export function Navbar() {
   }
 
   return (
-    <nav className="border-b bg-white shadow-sm">
+    <nav className="sticky top-0 z-50 w-full border-b border-[#98C1B2] bg-white/80 backdrop-blur-sm">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-6">
-            <Link href="/" className="text-xl font-semibold text-gray-800">
-              Meal Planner
+            <Link href="/" className="text-2xl font-serif text-[#2F4F4F] hover:text-[#98C1B2] transition-colors">
+              Pantry Planner 
             </Link>
             {user && (
-              <div className="flex gap-4">
-                <NavLink href="/calendar">Calendar</NavLink>
-                <NavLink href="/groups">Groups</NavLink>
-                <NavLink href="/meals">Meals</NavLink>
+              <div className="hidden md:flex items-center gap-4">
+                <Link 
+                  href="/calendar" 
+                  className="text-[#2F4F4F] hover:text-[#98C1B2] font-medium transition-colors"
+                >
+                  Calendar
+                </Link>
+                <Link 
+                  href="/meals" 
+                  className="text-[#2F4F4F] hover:text-[#98C1B2] font-medium transition-colors"
+                >
+                  Meals
+                </Link>
+                <Link 
+                  href="/groups" 
+                  className="text-[#2F4F4F] hover:text-[#98C1B2] font-medium transition-colors"
+                >
+                  Groups
+                </Link>
               </div>
             )}
           </div>
-          
           <div className="flex items-center gap-4">
             {user ? (
-              <>
-                <span className="text-sm text-gray-600">
-                  {user.email}
-                </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Avatar className="h-8 w-8 cursor-pointer">
-                      <AvatarFallback className="bg-primary text-primary-foreground">
-                        {getInitials(user.email || '')}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    className="relative h-10 w-10 rounded-full border-2 border-[#98C1B2] hover:bg-[#98C1B2]/10"
+                  >
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src={user.user_metadata.avatar_url} />
+                      <AvatarFallback className="bg-[#FF9B76]/10 text-[#2F4F4F]">
+                        {user.email?.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => router.push('/profile')}>
-                      Profile
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleSignOut}>
-                      Sign Out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-serif">My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="cursor-pointer">Profile</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleSignOut}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer"
+                  >
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <Link href="/auth">
-                <Button variant="default">
+                <Button className="bg-[#FF9B76] hover:bg-[#FF9B76]/90 text-white">
                   Sign In
                 </Button>
               </Link>

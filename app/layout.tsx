@@ -3,6 +3,10 @@ import { AuthProvider } from '@/lib/contexts/AuthContext'
 import { Navbar } from '@/components/navbar'
 import './globals.css'
 import { Toaster } from 'sonner'
+import { GeistSans } from 'geist/font/sans'
+import { Playfair_Display } from 'next/font/google'
+
+const playfair = Playfair_Display({ subsets: ['latin'] })
 
 export default function RootLayout({
   children,
@@ -10,15 +14,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="light">
-      <body className="min-h-screen bg-gray-50 antialiased">
+    <html lang="en" className={GeistSans.className}>
+      <body className="min-h-screen bg-[#F5E6D3]">
         <AuthProvider>
-          <div className="flex min-h-screen flex-col">
-            <Navbar />
-            <main className="flex-1 container mx-auto px-4 py-8">
-              {children}
-            </main>
-          </div>
+          <Navbar />
+          <main className="container mx-auto px-4 py-6">
+            {children}
+          </main>
           <Toaster />
         </AuthProvider>
       </body>
