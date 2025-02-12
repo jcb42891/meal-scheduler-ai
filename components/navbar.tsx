@@ -86,12 +86,11 @@ export function Navbar() {
                 </DropdownMenu>
               </>
             ) : (
-              <Button
-                variant="default"
-                onClick={() => router.push('/auth')}
-              >
-                Sign In
-              </Button>
+              <Link href="/auth">
+                <Button variant="default">
+                  Sign In
+                </Button>
+              </Link>
             )}
           </div>
         </div>
