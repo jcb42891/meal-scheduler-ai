@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, PlusCircle, Trash2 } from 'lucide-react'
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth } from 'date-fns'
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, startOfWeek, endOfWeek } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { AddMealModal } from './add-meal-modal'
@@ -120,8 +120,8 @@ export default function CalendarPage() {
   }, [selectedGroupId, currentDate])
 
   const days = eachDayOfInterval({
-    start: startOfMonth(currentDate),
-    end: endOfMonth(currentDate)
+    start: startOfWeek(startOfMonth(currentDate)),
+    end: endOfWeek(endOfMonth(currentDate))
   })
 
   const previousMonth = () => setCurrentDate(subMonths(currentDate, 1))
