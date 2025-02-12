@@ -9,6 +9,7 @@ import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterv
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { AddMealModal } from './add-meal-modal'
+import { GroceryListModal } from './grocery-list-modal'
 
 type GroupMember = {
   group: {
@@ -26,6 +27,12 @@ export default function CalendarPage() {
   const [showAddMeal, setShowAddMeal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [calendarMeals, setCalendarMeals] = useState<Record<string, { id: string; name: string }>>({})
+  const [dateRange, setDateRange] = useState<{
+    start: Date | null
+    end: Date | null
+  }>({ start: null, end: null })
+  const [showGroceryList, setShowGroceryList] = useState(false)
+  const [isSelecting, setIsSelecting] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -140,8 +147,47 @@ export default function CalendarPage() {
     }
   }
 
+  const isDateInRange = (date: Date) => {
+    if (!dateRange.start || !dateRange.end) return false
+    return (
+      date >= dateRange.start &&
+      date <= dateRange.end
+    )
+  }
+
+  const handleCalendarClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('[data-day]') === null) {
+      setDateRange({ start: null, end: null })
+      setIsSelecting(false)
+      setShowGroceryList(false)
+    }
+  }
+
+  const handleDateClick = (date: Date, e: React.MouseEvent) => {
+    e.stopPropagation()
+
+    if (!isSelecting) {
+      setDateRange({ start: date, end: null })
+      setIsSelecting(true)
+      setShowGroceryList(false)
+    } else {
+      const start = dateRange.start!
+      const end = date
+      setDateRange({
+        start: start < end ? start : end,
+        end: start < end ? end : start
+      })
+      setIsSelecting(false)
+    }
+  }
+
+  const handleGenerateList = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowGroceryList(true)
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" onClick={handleCalendarClick}>
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
         <select
@@ -193,9 +239,14 @@ export default function CalendarPage() {
               return (
                 <div
                   key={day.toISOString()}
-                  className={`min-h-[100px] bg-white p-2 ${
-                    !isSameMonth(day, currentDate) ? 'text-gray-400' : ''
-                  } ${meal ? 'bg-blue-50' : ''}`}
+                  data-day="true"
+                  className={`min-h-[100px] bg-white p-2 cursor-pointer
+                    ${!isSameMonth(day, currentDate) ? 'text-gray-400' : ''}
+                    ${meal ? 'bg-blue-50' : ''}
+                    ${isDateInRange(day) ? 'ring-2 ring-primary' : ''}
+                    ${dateRange.start && format(dateRange.start, 'yyyy-MM-dd') === dateStr ? 'ring-2 ring-primary ring-offset-2' : ''}
+                  `}
+                  onClick={(e) => handleDateClick(day, e)}
                 >
                   <div className="flex justify-between items-start">
                     <time dateTime={dateStr}>
@@ -216,7 +267,8 @@ export default function CalendarPage() {
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation()
                             setSelectedDate(day)
                             setShowAddMeal(true)
                           }}
@@ -246,6 +298,33 @@ export default function CalendarPage() {
           date={selectedDate}
           onMealAdded={fetchCalendarMeals}
         />
+      )}
+
+      {dateRange.start && (
+        <>
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={handleGenerateList}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              Generate Grocery List
+            </Button>
+          </div>
+
+          <GroceryListModal
+            open={showGroceryList}
+            onOpenChange={(open) => {
+              setShowGroceryList(open)
+              if (!open) {
+                setDateRange({ start: null, end: null })
+                setIsSelecting(false)
+              }
+            }}
+            groupId={selectedGroupId}
+            startDate={dateRange.start}
+            endDate={dateRange.end || dateRange.start}
+          />
+        </>
       )}
     </div>
   )
