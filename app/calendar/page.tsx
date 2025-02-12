@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react'
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { AddMealModal } from './add-meal-modal'
 
 type GroupMember = {
   group: {
@@ -22,6 +23,9 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [userGroups, setUserGroups] = useState<{ id: string; name: string }[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState<string>('')
+  const [showAddMeal, setShowAddMeal] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [calendarMeals, setCalendarMeals] = useState<Record<string, { id: string; name: string }>>({})
 
   useEffect(() => {
     if (!user) {
@@ -73,6 +77,40 @@ export default function CalendarPage() {
       setSelectedGroupId(allGroups[0].id)
     }
   }
+
+  const fetchCalendarMeals = async () => {
+    if (!selectedGroupId) return
+
+    const startDate = startOfMonth(currentDate)
+    const endDate = endOfMonth(currentDate)
+
+    const { data, error } = await supabase
+      .from('meal_calendar')
+      .select(`
+        date,
+        meal:meals(id, name)
+      `)
+      .eq('group_id', selectedGroupId)
+      .gte('date', startDate.toISOString())
+      .lte('date', endDate.toISOString())
+
+    if (error) {
+      toast.error('Failed to load calendar meals')
+      return
+    }
+
+    const mealsMap: Record<string, { id: string; name: string }> = {}
+    data.forEach(item => {
+      mealsMap[item.date] = item.meal
+    })
+    setCalendarMeals(mealsMap)
+  }
+
+  useEffect(() => {
+    if (selectedGroupId) {
+      fetchCalendarMeals()
+    }
+  }, [selectedGroupId, currentDate])
 
   const days = eachDayOfInterval({
     start: startOfMonth(currentDate),
@@ -128,21 +166,56 @@ export default function CalendarPage() {
             ))}
 
             {/* Calendar days */}
-            {days.map((day, dayIdx) => (
-              <div
-                key={day.toISOString()}
-                className={`min-h-[100px] bg-white p-2 ${
-                  !isSameMonth(day, currentDate) ? 'text-gray-400' : ''
-                }`}
-              >
-                <time dateTime={format(day, 'yyyy-MM-dd')}>
-                  {format(day, 'd')}
-                </time>
-              </div>
-            ))}
+            {days.map((day) => {
+              const dateStr = format(day, 'yyyy-MM-dd')
+              const meal = calendarMeals[dateStr]
+              
+              return (
+                <div
+                  key={day.toISOString()}
+                  className={`min-h-[100px] bg-white p-2 ${
+                    !isSameMonth(day, currentDate) ? 'text-gray-400' : ''
+                  } ${meal ? 'bg-blue-50' : ''}`}
+                >
+                  <div className="flex justify-between items-start">
+                    <time dateTime={dateStr}>
+                      {format(day, 'd')}
+                    </time>
+                    {!meal && isSameMonth(day, currentDate) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => {
+                          setSelectedDate(day)
+                          setShowAddMeal(true)
+                        }}
+                      >
+                        <PlusCircle className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {meal && (
+                    <div className="mt-1 text-sm font-medium text-blue-700">
+                      {meal.name}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
+
+      {selectedDate && (
+        <AddMealModal
+          open={showAddMeal}
+          onOpenChange={setShowAddMeal}
+          groupId={selectedGroupId}
+          date={selectedDate}
+          onMealAdded={fetchCalendarMeals}
+        />
+      )}
     </div>
   )
 } 
