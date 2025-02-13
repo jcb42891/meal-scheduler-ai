@@ -9,6 +9,8 @@ import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import Image from "next/image"
+import authBgImage from '@/public/auth-bg.jpg'
 
 
 export default function AuthPage() {
@@ -137,9 +139,22 @@ export default function AuthPage() {
   }
 
   return (
-    <>
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <Card className="w-full max-w-md">
+    <div className="relative min-h-[calc(100vh-4rem)]">
+      {/* Background Image */}
+      <Image
+        src={authBgImage}
+        alt="Background"
+        fill
+        priority
+        className="object-cover"
+      />
+      
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black/20" />
+      
+      {/* Content */}
+      <div className="relative z-10 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <Card className="w-full max-w-md bg-white/95 backdrop-blur-sm shadow-xl">
           <CardHeader className="space-y-1">
             <h2 className="text-2xl font-bold text-center">Welcome</h2>
             <p className="text-sm text-muted-foreground text-center">
@@ -246,6 +261,6 @@ export default function AuthPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 } 
