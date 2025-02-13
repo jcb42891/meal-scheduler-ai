@@ -48,7 +48,7 @@ export default function CalendarPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>("")
   const [showAddMeal, setShowAddMeal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [calendarMeals, setCalendarMeals] = useState<Record<string, { id: string; name: string }>>({})
+  const [calendarMeals, setCalendarMeals] = useState<Record<string, { id: string; name: string; category: string }>>({})
   const [dateRange, setDateRange] = useState<{
     start: Date | null
     end: Date | null
@@ -128,7 +128,7 @@ export default function CalendarPage() {
       return
     }
 
-    const mealsMap: Record<string, { id: string; name: string }> = {}
+    const mealsMap: Record<string, { id: string; name: string; category: string }> = {}
     data.forEach((item) => {
       mealsMap[item.date] = item.meal
     })
@@ -170,17 +170,29 @@ export default function CalendarPage() {
   }
 
   const isDateInRange = (date: Date) => {
+    if (dateRange.start && !dateRange.end) {
+      return format(date, "yyyy-MM-dd") === format(dateRange.start, "yyyy-MM-dd")
+    }
     if (!dateRange.start || !dateRange.end) return false
     return date >= dateRange.start && date <= dateRange.end
   }
 
-  const handleCalendarClick = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("[data-day]") === null) {
-      setDateRange({ start: null, end: null })
-      setIsSelecting(false)
-      setShowGroceryList(false)
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      if (
+        !(e.target as HTMLElement).closest("[data-day]") && 
+        !(e.target as HTMLElement).closest("[role='dialog']") &&
+        !(e.target as HTMLElement).closest("[data-grocery-button]")
+      ) {
+        setDateRange({ start: null, end: null })
+        setIsSelecting(false)
+        setShowGroceryList(false)
+      }
     }
-  }
+
+    document.addEventListener('click', handleDocumentClick)
+    return () => document.removeEventListener('click', handleDocumentClick)
+  }, [])
 
   const handleDateClick = (date: Date, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -206,7 +218,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5E6D3] p-6 space-y-6" onClick={handleCalendarClick}>
+    <div className="min-h-screen bg-[#F5E6D3] p-6 space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-[#2F4F4F]">Meal Calendar</h1>
         <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
@@ -256,13 +268,29 @@ export default function CalendarPage() {
                 <div
                   key={day.toISOString()}
                   data-day="true"
-                  className={`min-h-[120px] bg-white p-3 transition-all duration-200
-                    ${!isSameMonth(day, currentDate) ? "text-gray-400 bg-gray-50" : ""}
-                    ${meal ? "bg-[#98C1B2]/10" : ""}
-                    ${isDateInRange(day) ? "ring-2 ring-[#FF9B76]" : ""}
-                    ${dateRange.start && format(dateRange.start, "yyyy-MM-dd") === dateStr ? "ring-2 ring-[#FF9B76] ring-offset-2" : ""}
-                    hover:bg-[#98C1B2]/5 cursor-pointer
-                  `}
+                  className={cn(
+                    "min-h-[120px] p-3 transition-all duration-200 relative",
+                    "hover:bg-[#98C1B2]/5 cursor-pointer",
+                    !isSameMonth(day, currentDate) ? "text-gray-400 bg-gray-50" : "bg-white",
+                    meal ? "bg-[#98C1B2]/10" : "",
+                    isDateInRange(day) && [
+                      "bg-[#FF9B76]/20",
+                      // Single day or range borders
+                      dateRange.start && !dateRange.end && format(day, "yyyy-MM-dd") === format(dateRange.start, "yyyy-MM-dd")
+                        ? "border-2 border-[#FF9B76]" // Full border for single selected day
+                        : [
+                            // Top and bottom borders for range
+                            "before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-[#FF9B76]",
+                            "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#FF9B76]",
+                            // Left border for first day in range
+                            dateRange.start && format(day, "yyyy-MM-dd") === format(dateRange.start, "yyyy-MM-dd") &&
+                              "border-l-2 border-l-[#FF9B76]",
+                            // Right border for last day in range
+                            dateRange.end && format(day, "yyyy-MM-dd") === format(dateRange.end, "yyyy-MM-dd") &&
+                              "border-r-2 border-r-[#FF9B76]"
+                          ]
+                    ]
+                  )}
                   onClick={(e) => handleDateClick(day, e)}
                 >
                   <div className="flex justify-between items-start">
@@ -327,6 +355,7 @@ export default function CalendarPage() {
           <div className="mt-6 flex justify-end">
             <Button
               onClick={handleGenerateList}
+              data-grocery-button
               className="bg-[#FF9B76] hover:bg-[#FF9B76]/90 text-white font-medium px-6 py-2 rounded-full shadow-md hover:shadow-lg transition-all duration-200"
             >
               Generate Grocery List
@@ -335,13 +364,7 @@ export default function CalendarPage() {
 
           <GroceryListModal
             open={showGroceryList}
-            onOpenChange={(open) => {
-              setShowGroceryList(open)
-              if (!open) {
-                setDateRange({ start: null, end: null })
-                setIsSelecting(false)
-              }
-            }}
+            onOpenChange={setShowGroceryList}
             groupId={selectedGroupId}
             startDate={dateRange.start}
             endDate={dateRange.end || dateRange.start}
