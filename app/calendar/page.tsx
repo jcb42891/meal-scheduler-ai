@@ -21,6 +21,8 @@ import { toast } from "sonner"
 import { AddMealModal } from "./add-meal-modal"
 import { GroceryListModal } from "./grocery-list-modal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { MealCategory, getCategoryColor } from "@/app/meals/meal-utils"
+import { cn } from "@/lib/utils"
 
 type GroupMember = {
   group: {
@@ -34,6 +36,7 @@ type MealCalendarResponse = {
   meal: {
     id: string
     name: string
+    category: string
   }
 }
 
@@ -113,7 +116,7 @@ export default function CalendarPage() {
       .from("meal_calendar")
       .select(`
         date,
-        meal:meals(id, name)
+        meal:meals(id, name, category)
       `)
       .eq("group_id", selectedGroupId)
       .gte("date", startDate.toISOString())
@@ -295,7 +298,10 @@ export default function CalendarPage() {
                       ))}
                   </div>
                   {meal && (
-                    <div className="mt-2 p-2 rounded-lg bg-[#98C1B2]/20 text-sm font-medium text-[#2F4F4F]">
+                    <div className={cn(
+                      "mt-2 p-2 rounded-lg text-sm font-medium",
+                      getCategoryColor(meal.category as MealCategory)
+                    )}>
                       {meal.name}
                     </div>
                   )}
