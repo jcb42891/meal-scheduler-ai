@@ -111,189 +111,188 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Create New Meal</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label>Category</Label>
-            <div className="flex gap-2">
-              {Object.values(MEAL_CATEGORIES).map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategory(cat)}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-sm font-medium',
-                    category === cat 
-                      ? getCategoryColor(cat as MealCategory)
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  )}
-                >
-                  {cat}
-                </button>
-              ))}
+        
+        <div className="flex-1 overflow-y-auto pr-2">
+          <form id="create-meal-form" onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-4">
-            <Label>Ingredients</Label>
             
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  placeholder="Search or add new ingredient"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  list="ingredients-list"
-                />
-                <datalist id="ingredients-list">
-                  {ingredients
-                    .filter(i => !selectedIngredients.some(si => si.ingredient.id === i.id))
-                    .map(ingredient => (
-                      <option key={ingredient.id} value={ingredient.name} />
-                    ))}
-                </datalist>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <div className="flex gap-2">
+                {Object.values(MEAL_CATEGORIES).map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategory(cat)}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-sm font-medium',
+                      category === cat 
+                        ? getCategoryColor(cat as MealCategory)
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    )}
+                  >
+                    {cat}
+                  </button>
+                ))}
               </div>
-              <Button
-                type="button"
-                onClick={async () => {
-                  if (!searchTerm) return
-                  
-                  // Check if ingredient exists
-                  const existingIngredient = ingredients.find(
-                    i => i.name.toLowerCase() === searchTerm.toLowerCase()
-                  )
-
-                  if (existingIngredient) {
-                    setSelectedIngredients([
-                      ...selectedIngredients,
-                      { ingredient: existingIngredient, quantity: 1, unit: 'unit' }
-                    ])
-                  } else {
-                    // Create new ingredient
-                    const { data, error } = await supabase
-                      .from('ingredients')
-                      .insert({ name: searchTerm })
-                      .select()
-                      .single()
-
-                    if (!error && data) {
-                      setIngredients([...ingredients, data])
-                      setSelectedIngredients([
-                        ...selectedIngredients,
-                        { ingredient: data, quantity: 1, unit: 'unit' }
-                      ])
-                    }
-                  }
-                  setSearchTerm('')
-                }}
-              >
-                Add
-              </Button>
             </div>
 
             <div className="space-y-2">
-              {selectedIngredients.map((item, index) => (
-                <div key={item.ingredient.id} className="flex items-center gap-2 p-2 border rounded">
-                  <span className="flex-1 font-medium">{item.ingredient.name}</span>
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-col">
-                      <Label htmlFor={`quantity-${item.ingredient.id}`} className="text-xs">
-                        Quantity
-                      </Label>
-                      <Input
-                        id={`quantity-${item.ingredient.id}`}
-                        type="number"
-                        value={item.quantity || ''}
-                        onChange={(e) => {
-                          const newIngredients = [...selectedIngredients]
-                          newIngredients[index].quantity = e.target.value === '' ? 0 : parseFloat(e.target.value)
-                          setSelectedIngredients(newIngredients)
-                        }}
-                        className="w-20"
-                        min="0"
-                        step="0.1"
-                      />
-                    </div>
-                    <div className="flex flex-col">
-                      <Label htmlFor={`unit-${item.ingredient.id}`} className="text-xs">
-                        Unit
-                      </Label>
-                      <select
-                        id={`unit-${item.ingredient.id}`}
-                        value={item.unit}
-                        onChange={(e) => {
-                          const newIngredients = [...selectedIngredients]
-                          newIngredients[index].unit = e.target.value
-                          setSelectedIngredients(newIngredients)
-                        }}
-                        className="h-10 w-24 rounded-md border border-input bg-background px-3 text-sm"
-                      >
-                        <option value="unit">unit</option>
-                        <option value="oz">oz</option>
-                        <option value="g">grams</option>
-                        <option value="kg">kilograms</option>
-                        <option value="ml">milliliters</option>
-                        <option value="l">liters</option>
-                        <option value="tbsp">tablespoons</option>
-                        <option value="tsp">teaspoons</option>
-                        <option value="cup">cups</option>
-                      </select>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setSelectedIngredients(
-                          selectedIngredients.filter((_, i) => i !== index)
-                        )
-                      }}
-                      className="text-destructive hover:text-destructive/90"
-                    >
-                      ×
-                    </Button>
-                  </div>
-                </div>
-              ))}
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+              />
             </div>
-          </div>
 
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Meal'}
-            </Button>
-          </div>
-        </form>
+            <div className="space-y-4">
+              <Label>Ingredients</Label>
+              
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    placeholder="Search or add new ingredient"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    list="ingredients-list"
+                  />
+                  <datalist id="ingredients-list">
+                    {ingredients
+                      .filter(i => !selectedIngredients.some(si => si.ingredient.id === i.id))
+                      .map(ingredient => (
+                        <option key={ingredient.id} value={ingredient.name} />
+                      ))}
+                  </datalist>
+                </div>
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    if (!searchTerm) return
+                    
+                    // Check if ingredient exists
+                    const existingIngredient = ingredients.find(
+                      i => i.name.toLowerCase() === searchTerm.toLowerCase()
+                    )
+
+                    if (existingIngredient) {
+                      setSelectedIngredients([
+                        ...selectedIngredients,
+                        { ingredient: existingIngredient, quantity: 1, unit: 'unit' }
+                      ])
+                    } else {
+                      // Create new ingredient
+                      const { data, error } = await supabase
+                        .from('ingredients')
+                        .insert({ name: searchTerm })
+                        .select()
+                        .single()
+
+                      if (!error && data) {
+                        setIngredients([...ingredients, data])
+                        setSelectedIngredients([
+                          ...selectedIngredients,
+                          { ingredient: data, quantity: 1, unit: 'unit' }
+                        ])
+                      }
+                    }
+                    setSearchTerm('')
+                  }}
+                >
+                  Add
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                {selectedIngredients.map((item, index) => (
+                  <div key={item.ingredient.id} className="flex items-center gap-2 p-2 border rounded">
+                    <span className="flex-1 font-medium">{item.ingredient.name}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-col">
+                        <Label htmlFor={`quantity-${item.ingredient.id}`} className="text-xs">
+                          Quantity
+                        </Label>
+                        <Input
+                          id={`quantity-${item.ingredient.id}`}
+                          type="number"
+                          value={item.quantity || ''}
+                          onChange={(e) => {
+                            const newIngredients = [...selectedIngredients]
+                            newIngredients[index].quantity = e.target.value === '' ? 0 : parseFloat(e.target.value)
+                            setSelectedIngredients(newIngredients)
+                          }}
+                          className="w-20"
+                          min="0"
+                          step="0.1"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <Label htmlFor={`unit-${item.ingredient.id}`} className="text-xs">
+                          Unit
+                        </Label>
+                        <select
+                          id={`unit-${item.ingredient.id}`}
+                          value={item.unit}
+                          onChange={(e) => {
+                            const newIngredients = [...selectedIngredients]
+                            newIngredients[index].unit = e.target.value
+                            setSelectedIngredients(newIngredients)
+                          }}
+                          className="h-10 w-24 rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="unit">unit</option>
+                          <option value="oz">oz</option>
+                          <option value="g">grams</option>
+                          <option value="kg">kilograms</option>
+                          <option value="ml">milliliters</option>
+                          <option value="l">liters</option>
+                          <option value="tbsp">tablespoons</option>
+                          <option value="tsp">teaspoons</option>
+                          <option value="cup">cups</option>
+                        </select>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setSelectedIngredients(
+                            selectedIngredients.filter((_, i) => i !== index)
+                          )
+                        }}
+                        className="text-destructive hover:text-destructive/90"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </form>
+        </div>
+        
+        <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" form="create-meal-form" disabled={isSubmitting}>
+            {isSubmitting ? 'Creating...' : 'Create Meal'}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
