@@ -103,31 +103,34 @@ export function GroceryListModal({ open, onOpenChange, groupId, startDate, endDa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-none">
           <DialogTitle>Grocery List</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        
+        <div className="flex flex-col flex-1 min-h-0">
           {isLoading ? (
-            <p className="text-center text-muted-foreground">Generating list...</p>
+            <p className="text-center text-muted-foreground py-4">Generating list...</p>
           ) : (
             <>
-              <div className="space-y-2">
-                {Object.values(ingredients)
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((ingredient) => (
-                    <div
-                      key={`${ingredient.name}-${ingredient.unit}`}
-                      className="flex justify-between items-center"
-                    >
-                      <span>{ingredient.name}</span>
-                      <span className="text-muted-foreground">
-                        {ingredient.total} {ingredient.unit}
-                      </span>
-                    </div>
-                  ))}
+              <div className="flex-1 overflow-y-auto pr-2 -mr-2">
+                <div className="space-y-2">
+                  {Object.values(ingredients)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((ingredient) => (
+                      <div
+                        key={`${ingredient.name}-${ingredient.unit}`}
+                        className="flex justify-between items-center py-1"
+                      >
+                        <span>{ingredient.name}</span>
+                        <span className="text-muted-foreground ml-4">
+                          {ingredient.total} {ingredient.unit}
+                        </span>
+                      </div>
+                    ))}
+                </div>
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-4 mt-4 border-t flex-none">
                 <Button onClick={copyToClipboard}>
                   <Copy className="h-4 w-4 mr-2" />
                   Copy to Clipboard
