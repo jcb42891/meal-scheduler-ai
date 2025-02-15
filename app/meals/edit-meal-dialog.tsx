@@ -210,9 +210,41 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
     }
   }
 
+  const handleAddIngredient = async () => {
+    if (!searchTerm) return
+    
+    // Check if ingredient exists
+    const existingIngredient = ingredients.find(
+      i => i.name.toLowerCase() === searchTerm.toLowerCase()
+    )
+
+    if (existingIngredient) {
+      setSelectedIngredients([
+        ...selectedIngredients,
+        { ingredient: existingIngredient, quantity: 1, unit: 'unit' }
+      ])
+    } else {
+      // Create new ingredient
+      const { data, error } = await supabase
+        .from('ingredients')
+        .insert({ name: searchTerm })
+        .select()
+        .single()
+
+      if (!error && data) {
+        setIngredients([...ingredients, data])
+        setSelectedIngredients([
+          ...selectedIngredients,
+          { ingredient: data, quantity: 1, unit: 'unit' }
+        ])
+      }
+    }
+    setSearchTerm('')
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] flex flex-col">
+      <DialogContent className="max-h-[90vh] flex flex-col w-full max-w-2xl mx-auto">
         <DialogHeader>
           <DialogTitle>Edit Meal</DialogTitle>
         </DialogHeader>
@@ -231,15 +263,15 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
             </div>
             
             <div className="space-y-2">
-            <Label>Category</Label>
-              <div className="flex gap-2">
+              <Label>Category</Label>
+              <div className="flex flex-wrap gap-2">
                 {Object.values(MEAL_CATEGORIES).map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setCategory(cat)}
                     className={cn(
-                      'px-3 py-1 rounded-full text-sm font-medium',
+                      'px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap',
                       category === cat 
                         ? getCategoryColor(cat as MealCategory)
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -264,68 +296,26 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
 
             <div className="space-y-4">
               <Label>Ingredients</Label>
-              
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <div className="flex-1">
                   <Input
                     placeholder="Search or add new ingredient"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    list="ingredients-list"
-                    className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
+                    className="w-full bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
                   />
-                  <datalist id="ingredients-list">
-                    {!isLoadingIngredients && ingredients
-                      .filter(i => !selectedIngredients?.some(si => si?.ingredient?.id === i?.id))
-                      .map(ingredient => (
-                        <option key={ingredient.id} value={ingredient.name} />
-                      ))}
-                  </datalist>
                 </div>
-                <Button
-                  type="button"
-                  onClick={async () => {
-                    if (!searchTerm) return
-                    
-                    // Check if ingredient exists
-                    const existingIngredient = ingredients.find(
-                      i => i.name.toLowerCase() === searchTerm.toLowerCase()
-                    )
-
-                    if (existingIngredient) {
-                      setSelectedIngredients([
-                        ...selectedIngredients,
-                        { ingredient: existingIngredient, quantity: 1, unit: 'unit' }
-                      ])
-                    } else {
-                      // Create new ingredient
-                      const { data, error } = await supabase
-                        .from('ingredients')
-                        .insert({ name: searchTerm })
-                        .select()
-                        .single()
-
-                      if (!error && data) {
-                        setIngredients([...ingredients, data])
-                        setSelectedIngredients([
-                          ...selectedIngredients,
-                          { ingredient: data, quantity: 1, unit: 'unit' }
-                        ])
-                      }
-                    }
-                    setSearchTerm('')
-                  }}
-                >
+                <Button type="button" onClick={handleAddIngredient} className="w-full sm:w-auto">
                   Add
                 </Button>
               </div>
 
               <div className="space-y-2">
-                {selectedIngredients?.length > 0 && selectedIngredients.map((item, index) => (
-                  <div key={item?.ingredient?.id || index} className="flex items-center gap-2 p-2 border rounded">
-                    <span className="flex-1 font-medium">{item?.ingredient?.name}</span>
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-col">
+                {selectedIngredients?.map((item, index) => (
+                  <div key={item?.ingredient?.id || index} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-2 border rounded">
+                    <span className="font-medium flex-1">{item?.ingredient?.name}</span>
+                    <div className="flex flex-wrap sm:flex-nowrap items-end gap-2 w-full sm:w-auto">
+                      <div className="w-20">
                         <Label htmlFor={`quantity-${item?.ingredient?.id}`} className="text-xs">
                           Quantity
                         </Label>
@@ -338,12 +328,12 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                             newIngredients[index].quantity = e.target.value === '' ? 0 : parseFloat(e.target.value)
                             setSelectedIngredients(newIngredients)
                           }}
-                          className="w-20 bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
+                          className="w-full bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
                           min="0"
                           step="0.1"
                         />
                       </div>
-                      <div className="flex flex-col">
+                      <div className="w-24">
                         <Label htmlFor={`unit-${item?.ingredient?.id}`} className="text-xs">
                           Unit
                         </Label>
@@ -355,7 +345,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                             newIngredients[index].unit = e.target.value
                             setSelectedIngredients(newIngredients)
                           }}
-                          className="h-10 w-24 rounded-md border border-[#98C1B2]/30 bg-white/50 px-3 text-sm focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
+                          className="h-10 w-full rounded-md border border-[#98C1B2]/30 bg-white/50 px-3 text-sm focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
                         >
                           <option value="unit">unit</option>
                           <option value="oz">oz</option>

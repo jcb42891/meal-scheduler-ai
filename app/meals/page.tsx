@@ -152,13 +152,13 @@ export default function MealsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Meal Library</h1>
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Meal Library</h1>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
           <select
             value={selectedGroupId}
             onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="h-10 w-[200px] rounded-md border border-input bg-background px-3 text-sm"
+            className="h-10 w-full sm:w-[200px] rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="">Select a group</option>
             {userGroups.map((group) => (
@@ -167,15 +167,17 @@ export default function MealsPage() {
               </option>
             ))}
           </select>
-          <Button onClick={() => setShowCreateDialog(true)}>Create Meal</Button>
+          <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
+            Create Meal
+          </Button>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <h2 className="text-xl font-semibold">Your Meals</h2>
-            <div className="w-72">
+            <div className="w-full sm:w-72">
               <Input
                 type="search"
                 placeholder="Search meals..."
@@ -200,23 +202,21 @@ export default function MealsPage() {
               {filteredMeals.map((meal) => (
                 <div
                   key={meal.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4"
                 >
-                  <div>
+                  <div className="w-full sm:w-auto">
                     <h3 className="font-medium">{meal.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {meal.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{meal.description}</p>
                     {meal.category && (
                       <span className={cn(
-                        'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium',
+                        'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium mt-2 sm:mt-1',
                         getCategoryColor(meal.category as MealCategory)
                       )}>
                         {meal.category}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                     <Button
                       variant="ghost"
                       size="icon"
