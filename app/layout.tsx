@@ -1,6 +1,6 @@
 import React from 'react'
 import { AuthProvider } from '@/lib/contexts/AuthContext'
-import { Navbar } from '@/components/navbar'
+import { Navbar } from '@/app/components/navbar'
 import './globals.css'
 import { Toaster } from 'sonner'
 import { GeistSans } from 'geist/font/sans'
