@@ -75,45 +75,50 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Add Meal to {date.toLocaleDateString()}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-4">
-            {meals.map((meal) => (
-              <div
-                key={meal.id}
-                className={`p-4 rounded-lg border cursor-pointer ${
-                  selectedMealId === meal.id ? 'border-primary bg-primary/5' : ''
-                }`}
-                onClick={() => setSelectedMealId(meal.id)}
-              >
-                <h3 className="font-medium">{meal.name}</h3>
-                {meal.category && (
-                  <span className="text-sm text-muted-foreground">
-                    {meal.category}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={!selectedMealId || isSubmitting}
-            >
-              {isSubmitting ? 'Adding...' : 'Add Meal'}
-            </Button>
-          </div>
-        </form>
+
+        <div className="flex-1 overflow-y-auto pr-2">
+          <form id="add-meal-form" onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4">
+              {meals.map((meal) => (
+                <div
+                  key={meal.id}
+                  className={`p-4 rounded-lg border cursor-pointer hover:bg-[#98C1B2]/5 ${
+                    selectedMealId === meal.id ? 'border-[#98C1B2] bg-[#98C1B2]/10' : 'border-[#98C1B2]/30'
+                  }`}
+                  onClick={() => setSelectedMealId(meal.id)}
+                >
+                  <h3 className="font-medium">{meal.name}</h3>
+                  {meal.category && (
+                    <span className="text-sm text-muted-foreground">
+                      {meal.category}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </form>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="add-meal-form"
+            disabled={!selectedMealId || isSubmitting}
+          >
+            {isSubmitting ? 'Adding...' : 'Add Meal'}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
