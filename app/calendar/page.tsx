@@ -17,6 +17,7 @@ import {
   endOfWeek,
   subWeeks,
   addWeeks,
+  isSameDay,
 } from "date-fns"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
@@ -282,24 +283,43 @@ export default function CalendarPage() {
   const handleDateClick = (date: Date, e: React.MouseEvent) => {
     e.stopPropagation()
 
-    if (!isSelecting) {
+    // Don't handle range selection if clicking on meal actions
+    if ((e.target as HTMLElement).closest('button')) return
+
+    if (!dateRange.start) {
+      // First click - set start date
       setDateRange({ start: date, end: null })
       setIsSelecting(true)
       setShowGroceryList(false)
-    } else {
-      const start = dateRange.start!
-      const end = date
+    } else if (!dateRange.end) {
+      // Second click - set end date and ensure correct order
+      const start = dateRange.start
       setDateRange({
-        start: start < end ? start : end,
-        end: start < end ? end : start,
+        start: start <= date ? start : date,
+        end: start <= date ? date : start
       })
       setIsSelecting(false)
+    } else {
+      // Reset and start new selection
+      setDateRange({ start: date, end: null })
+      setIsSelecting(true)
+      setShowGroceryList(false)
     }
   }
 
   const handleGenerateList = (e: React.MouseEvent) => {
     e.stopPropagation()
     setShowGroceryList(true)
+  }
+
+  const isRangeStart = (date: Date) => {
+    if (!dateRange.start) return false
+    return isSameDay(date, dateRange.start)
+  }
+
+  const isRangeEnd = (date: Date) => {
+    if (!dateRange.end) return false
+    return isSameDay(date, dateRange.end)
   }
 
   if (isAuthChecking) {
@@ -376,28 +396,36 @@ export default function CalendarPage() {
               {isMonthLoading && (
                 <div className="absolute inset-0 bg-white/80 z-10 transition-opacity duration-200" />
               )}
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                <div key={day} className="bg-[#98C1B2]/10 p-3 text-center text-sm font-medium text-[#2F4F4F]">
-                  {day}
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName) => (
+                <div key={dayName} className="bg-[#98C1B2]/10 p-3 text-center text-sm font-medium text-[#2F4F4F]">
+                  {dayName}
                 </div>
               ))}
-              
               {days.map((day) => {
                 const dateStr = format(day, "yyyy-MM-dd")
                 const meal = calendarMeals[dateStr]
 
                 return (
                   <div
-                    key={day.toISOString()}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDateClick(day, e)
-                    }}
+                    key={dateStr}
+                    data-day
+                    onClick={(e) => handleDateClick(day, e)}
                     className={cn(
                       "min-h-[100px] sm:min-h-[120px] p-3 bg-white relative cursor-pointer",
                       "hover:bg-[#98C1B2]/5",
                       !isSameMonth(day, currentDate) && "text-muted-foreground",
-                      meal && "bg-[#98C1B2]/10"
+                      meal && "bg-[#98C1B2]/10",
+                      isDateInRange(day) && [
+                        "relative z-10",
+                        // If it's a single day selection (no end date) or start and end are the same day
+                        (!dateRange.end || (dateRange.end && isSameDay(dateRange.start!, dateRange.end))) && "border-2 border-[#FF9B76]",
+                        // If it's part of a range (has end date)
+                        dateRange.end && [
+                          "border-t-2 border-b-2 border-[#FF9B76]",
+                          isRangeStart(day) && "border-l-2 border-[#FF9B76]",
+                          isRangeEnd(day) && "border-r-2 border-[#FF9B76]",
+                        ]
+                      ]
                     )}
                   >
                     <div className="flex justify-between items-start">
@@ -455,14 +483,13 @@ export default function CalendarPage() {
                 return (
                   <div
                     key={day.toISOString()}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDateClick(day, e)
-                    }}
+                    data-day
+                    onClick={(e) => handleDateClick(day, e)}
                     className={cn(
                       "p-4 bg-white rounded-lg border border-[#98C1B2]/30",
                       "hover:bg-[#98C1B2]/5",
-                      meal && "bg-[#98C1B2]/10"
+                      meal && "bg-[#98C1B2]/10",
+                      isDateInRange(day) && "ring-2 ring-[#FF9B76] z-10"
                     )}
                   >
                     <div className="flex justify-between items-start">
