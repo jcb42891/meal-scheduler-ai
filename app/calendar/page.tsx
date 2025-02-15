@@ -428,7 +428,6 @@ export default function CalendarPage() {
                     onClick={(e) => handleDateClick(day, e)}
                     className={cn(
                       "min-h-[100px] sm:min-h-[120px] p-3 bg-white relative cursor-pointer",
-                      "hover:bg-[#98C1B2]/5",
                       !isSameMonth(day, currentDate) && "text-muted-foreground",
                       meal && "bg-[#98C1B2]/10",
                       isDateInRange(day) && [
