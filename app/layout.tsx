@@ -8,6 +8,11 @@ import { Playfair_Display } from 'next/font/google'
 
 const playfair = Playfair_Display({ subsets: ['latin'] })
 
+export const metadata = {
+  title: '🛒 Pantry Planner',
+  description: 'Plan your meals and organize your grocery shopping',
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -15,6 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={GeistSans.className}>
+      <head />
       <body className="min-h-screen bg-[#F5E6D3]">
         <AuthProvider>
           <Navbar />
