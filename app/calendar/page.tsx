@@ -15,6 +15,8 @@ import {
   isSameMonth,
   startOfWeek,
   endOfWeek,
+  subWeeks,
+  addWeeks,
 } from "date-fns"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
@@ -58,6 +60,7 @@ export default function CalendarPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [isMonthLoading, setIsMonthLoading] = useState(false)
+  const [mobileWeekStart, setMobileWeekStart] = useState(startOfWeek(new Date()))
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -180,6 +183,11 @@ export default function CalendarPage() {
     end: endOfWeek(endOfMonth(currentDate)),
   })
 
+  const mobileDays = eachDayOfInterval({
+    start: mobileWeekStart,
+    end: endOfWeek(mobileWeekStart)
+  })
+
   const handlePrevMonth = async () => {
     setIsMonthLoading(true)
     setCurrentDate(prevDate => {
@@ -194,6 +202,14 @@ export default function CalendarPage() {
       const newDate = addMonths(prevDate, 1)
       return newDate
     })
+  }
+
+  const handlePrevWeek = () => {
+    setMobileWeekStart(prev => subWeeks(prev, 1))
+  }
+
+  const handleNextWeek = () => {
+    setMobileWeekStart(prev => addWeeks(prev, 1))
   }
 
   const deleteMeal = async (dateStr: string) => {
@@ -281,8 +297,7 @@ export default function CalendarPage() {
             <SelectValue placeholder="Select a group" />
           </SelectTrigger>
           <SelectContent>
-            {/* Changed default value to "Select a group" */}
-            <SelectItem value="Select a group">Select a group</SelectItem> {/* Added value prop */}
+            <SelectItem value="Select a group">Select a group</SelectItem>
             {userGroups.map((group) => (
               <SelectItem key={group.id} value={group.id}>
                 {group.name}
@@ -293,140 +308,198 @@ export default function CalendarPage() {
       </div>
 
       <div className="rounded-2xl border border-[#98C1B2] bg-white/80 backdrop-blur shadow-lg">
-        <div className="p-6">
-          {isLoading ? (
-            <>
-              <div className="flex items-center justify-between mb-6">
-                <div className="w-8 h-8 rounded-full animate-pulse bg-gray-200" />
-                <div className="w-32 h-8 rounded-md animate-pulse bg-gray-200" />
-                <div className="w-8 h-8 rounded-full animate-pulse bg-gray-200" />
-              </div>
+        <div className="p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-6">
+            <Button 
+              variant="ghost" 
+              onClick={() => {
+                if (window.innerWidth >= 640) {
+                  handlePrevMonth()
+                } else {
+                  handlePrevWeek()
+                }
+              }} 
+              disabled={isMonthLoading}
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <h2 className="text-2xl font-semibold text-[#2F4F4F]">
+              <span className="hidden sm:inline">
+                {format(currentDate, "MMMM yyyy")}
+              </span>
+              <span className="sm:hidden">
+                {format(mobileWeekStart, "MMM d")} - {format(endOfWeek(mobileWeekStart), "MMM d")}
+              </span>
+            </h2>
+            <Button 
+              variant="ghost" 
+              onClick={() => {
+                if (window.innerWidth >= 640) {
+                  handleNextMonth()
+                } else {
+                  handleNextWeek()
+                }
+              }}
+              disabled={isMonthLoading}
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
 
-              <div className="grid grid-cols-7 gap-px bg-[#98C1B2]/20 rounded-lg overflow-hidden">
-                {/* Day headers skeleton */}
-                {Array(7).fill(0).map((_, i) => (
-                  <div key={i} className="bg-[#98C1B2]/10 p-3 text-center">
-                    <div className="w-8 h-4 mx-auto rounded animate-pulse bg-gray-200" />
-                  </div>
-                ))}
+          <div className="hidden sm:block">
+            <div className="grid grid-cols-7 gap-px bg-[#98C1B2]/20 rounded-lg overflow-hidden relative">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                <div key={day} className="bg-[#98C1B2]/10 p-3 text-center text-sm font-medium text-[#2F4F4F]">
+                  {day}
+                </div>
+              ))}
+              
+              {days.map((day) => {
+                const dateStr = format(day, "yyyy-MM-dd")
+                const meal = calendarMeals[dateStr]
 
-                {/* Calendar days skeleton */}
-                {Array(35).fill(0).map((_, i) => (
-                  <div key={i} className="min-h-[120px] p-3 bg-white">
+                return (
+                  <div
+                    key={day.toISOString()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDateClick(day, e)
+                    }}
+                    className={cn(
+                      "min-h-[100px] sm:min-h-[120px] p-3 bg-white relative cursor-pointer",
+                      "hover:bg-[#98C1B2]/5",
+                      !isSameMonth(day, currentDate) && "text-muted-foreground",
+                      meal && "bg-[#98C1B2]/10"
+                    )}
+                  >
                     <div className="flex justify-between items-start">
-                      <div className="w-6 h-6 rounded animate-pulse bg-gray-200" />
-                      <div className="w-7 h-7 rounded animate-pulse bg-gray-200" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Calendar header */}
-              <div className="flex items-center justify-between mb-6">
-                <Button variant="ghost" onClick={handlePrevMonth} className="hover:text-[#2F4F4F] hover:bg-[#98C1B2]/20" disabled={isMonthLoading}>
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-                <h2 className="text-2xl font-semibold text-[#2F4F4F]">{format(currentDate, "MMMM yyyy")}</h2>
-                <Button variant="ghost" onClick={handleNextMonth} className="hover:text-[#2F4F4F] hover:bg-[#98C1B2]/20" disabled={isMonthLoading}>
-                  <ChevronRight className="h-5 w-5" />
-                </Button>
-              </div>
-
-              {/* Calendar grid */}
-              <div className="grid grid-cols-7 gap-px bg-[#98C1B2]/20 rounded-lg overflow-hidden relative">
-                {isMonthLoading && (
-                  <div className="absolute inset-0 bg-white/80 z-10 transition-opacity duration-200" />
-                )}
-                
-                {/* Day headers */}
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                  <div key={day} className="bg-[#98C1B2]/10 p-3 text-center text-sm font-medium text-[#2F4F4F]">
-                    {day}
-                  </div>
-                ))}
-
-                {/* Calendar days */}
-                {days.map((day) => {
-                  const dateStr = format(day, "yyyy-MM-dd")
-                  const meal = calendarMeals[dateStr]
-
-                  return (
-                    <div
-                      key={day.toISOString()}
-                      data-day="true"
-                      className={cn(
-                        "min-h-[120px] p-3 transition-all duration-200 relative",
-                        "hover:bg-[#98C1B2]/5 cursor-pointer",
-                        !isSameMonth(day, currentDate) ? "text-gray-400 bg-gray-50" : "bg-white",
-                        meal ? "bg-[#98C1B2]/10" : "",
-                        isDateInRange(day) && [
-                          "bg-[#FF9B76]/20",
-                          // Single day or range borders
-                          dateRange.start && !dateRange.end && format(day, "yyyy-MM-dd") === format(dateRange.start, "yyyy-MM-dd")
-                            ? "border-2 border-[#FF9B76]" // Full border for single selected day
-                            : [
-                                // Top and bottom borders for range
-                                "before:absolute before:top-0 before:left-0 before:right-0 before:h-[2px] before:bg-[#FF9B76]",
-                                "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-[#FF9B76]",
-                                // Left border for first day in range
-                                dateRange.start && format(day, "yyyy-MM-dd") === format(dateRange.start, "yyyy-MM-dd") &&
-                                  "border-l-2 border-l-[#FF9B76]",
-                                // Right border for last day in range
-                                dateRange.end && format(day, "yyyy-MM-dd") === format(dateRange.end, "yyyy-MM-dd") &&
-                                  "border-r-2 border-r-[#FF9B76]"
-                              ]
-                        ]
+                      <span className="text-sm font-medium">
+                        {format(day, "d")}
+                      </span>
+                      {selectedGroupId && (
+                        meal ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-red-500 hover:text-red-600"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteMeal(dateStr)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDateClick(day, e)
+                            }}
+                          >
+                            <PlusCircle className="h-4 w-4" />
+                          </Button>
+                        )
                       )}
-                      onClick={(e) => handleDateClick(day, e)}
-                    >
-                      <div className="flex justify-between items-start">
-                        <time dateTime={dateStr} className="font-medium text-[#2F4F4F]">
-                          {format(day, "d")}
-                        </time>
-                        {isSameMonth(day, currentDate) &&
-                          (meal ? (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                deleteMeal(dateStr)
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-[#2F4F4F] hover:text-[#98C1B2] hover:bg-[#98C1B2]/10"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedDate(day)
-                                setShowAddMeal(true)
-                              }}
-                            >
-                              <PlusCircle className="h-4 w-4" />
-                            </Button>
-                          ))}
-                      </div>
-                      {meal && (
-                        <div className={cn(
-                          "mt-2 p-2 rounded-lg text-sm font-medium",
-                          getCategoryColor(meal.category as MealCategory)
-                        )}>
+                    </div>
+                    
+                    {meal && (
+                      <div className="mt-1">
+                        <div className="text-sm font-medium truncate">
                           {meal.name}
                         </div>
+                        <span className={cn(
+                          'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium mt-1',
+                          getCategoryColor(meal.category as MealCategory)
+                        )}>
+                          {meal.category}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="sm:hidden">
+            <div className="flex flex-col gap-2">
+              {mobileDays.map((day) => {
+                const dateStr = format(day, "yyyy-MM-dd")
+                const meal = calendarMeals[dateStr]
+
+                return (
+                  <div
+                    key={day.toISOString()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDateClick(day, e)
+                    }}
+                    className={cn(
+                      "p-4 bg-white rounded-lg border border-[#98C1B2]/30",
+                      "hover:bg-[#98C1B2]/5",
+                      meal && "bg-[#98C1B2]/10"
+                    )}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-medium">
+                          {format(day, "EEE")}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {format(day, "MMM d")}
+                        </span>
+                      </div>
+                      {selectedGroupId && (
+                        meal ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-500 hover:text-red-600"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteMeal(dateStr)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedDate(day)
+                              setShowAddMeal(true)
+                            }}
+                          >
+                            <PlusCircle className="h-4 w-4" />
+                          </Button>
+                        )
                       )}
                     </div>
-                  )
-                })}
-              </div>
-            </>
-          )}
+                    
+                    {meal && (
+                      <div className="mt-2">
+                        <div className="text-sm font-medium">
+                          {meal.name}
+                        </div>
+                        <span className={cn(
+                          'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium mt-1',
+                          getCategoryColor(meal.category as MealCategory)
+                        )}>
+                          {meal.category}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -436,7 +509,34 @@ export default function CalendarPage() {
           onOpenChange={setShowAddMeal}
           groupId={selectedGroupId}
           date={selectedDate}
-          onMealAdded={() => {}}
+          onMealAdded={async () => {
+            // Fetch updated meals for the current week/month
+            const start = window.innerWidth >= 640 
+              ? startOfMonth(currentDate)
+              : mobileWeekStart
+            const end = window.innerWidth >= 640
+              ? endOfMonth(currentDate)
+              : endOfWeek(mobileWeekStart)
+
+            const { data, error } = await supabase
+              .from('meal_calendar')
+              .select('date, meal:meals(id, name, category)')
+              .eq('group_id', selectedGroupId)
+              .gte('date', start.toISOString().split('T')[0])
+              .lte('date', end.toISOString().split('T')[0])
+
+            if (error) {
+              console.error('Error refreshing calendar:', error)
+              return
+            }
+
+            const meals = data.reduce((acc, item) => ({
+              ...acc,
+              [item.date]: item.meal
+            }), {})
+
+            setCalendarMeals(meals)
+          }}
         />
       )}
 
