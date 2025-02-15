@@ -223,9 +223,9 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
           {group?.name || 'Loading...'}
         </h1>
         {!isOwner && (
@@ -233,6 +233,7 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
             variant="destructive" 
             onClick={handleLeaveGroup}
             disabled={isLeaving}
+            className="w-full sm:w-auto"
           >
             {isLeaving ? 'Leaving...' : 'Leave Group'}
           </Button>
@@ -241,18 +242,19 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
 
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold">Invite Members</h2>
+          <h2 className="text-lg sm:text-xl font-semibold">Invite Members</h2>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleInvite} className="flex gap-2">
+          <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-2">
             <Input
               type="email"
               placeholder="Enter email address"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               required
+              className="w-full"
             />
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
               {isLoading ? 'Sending...' : 'Send Invite'}
             </Button>
           </form>
@@ -261,11 +263,11 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
 
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold">Members</h2>
+          <h2 className="text-lg sm:text-xl font-semibold">Members</h2>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <table className="w-full">
+          <div className="rounded-md border overflow-x-auto">
+            <table className="w-full min-w-[500px]">
               <thead className="bg-muted/50">
                 <tr className="border-b">
                   <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
@@ -279,7 +281,7 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
               <tbody>
                 {members.map((member) => (
                   <tr key={member.user_id} className="border-b">
-                    <td className="p-4">
+                    <td className="p-4 break-all">
                       {member.profile.email}
                       {member.user_id === user?.id && (
                         <span className="ml-2 text-sm text-muted-foreground">(me)</span>
@@ -296,7 +298,7 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
 
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold">Past Invitations</h2>
+          <h2 className="text-lg sm:text-xl font-semibold">Past Invitations</h2>
         </CardHeader>
         <CardContent>
           {invitations.length === 0 ? (
@@ -304,22 +306,23 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
           ) : (
             <div className="space-y-4">
               {invitations.map((invite) => (
-                <div key={invite.id} className="flex items-center justify-between">
+                <div key={invite.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <div>
-                    <p>{invite.email}</p>
+                    <p className="break-all">{invite.email}</p>
                     <p className="text-sm text-muted-foreground">
                       Invited {new Date(invite.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => copyInviteLink(invite.id)}
+                      className="w-full sm:w-auto"
                     >
                       Copy Invite Link
                     </Button>
-                    <span className="capitalize">{invite.status}</span>
+                    <span className="capitalize text-center sm:text-left">{invite.status}</span>
                   </div>
                 </div>
               ))}
