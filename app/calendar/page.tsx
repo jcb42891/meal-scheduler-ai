@@ -337,9 +337,7 @@ export default function CalendarPage() {
               {/* Calendar grid */}
               <div className="grid grid-cols-7 gap-px bg-[#98C1B2]/20 rounded-lg overflow-hidden relative">
                 {isMonthLoading && (
-                  <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center">
-                    <div className="w-8 h-8 rounded-full animate-pulse bg-[#98C1B2]/40" />
-                  </div>
+                  <div className="absolute inset-0 bg-white/80 z-10 transition-opacity duration-200" />
                 )}
                 
                 {/* Day headers */}
