@@ -9,7 +9,7 @@ import { Playfair_Display } from 'next/font/google'
 const playfair = Playfair_Display({ subsets: ['latin'] })
 
 export const metadata = {
-  title: '🛒 Pantry Planner',
+  title: 'Pantry Planner',
   description: 'Plan your meals and organize your grocery shopping',
 }
 
