@@ -147,7 +147,7 @@ export default function MealsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Meals</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Meal Library</h1>
         <div className="flex items-center gap-4">
           <select
             value={selectedGroupId}
