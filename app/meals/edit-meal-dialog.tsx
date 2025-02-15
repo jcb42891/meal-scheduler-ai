@@ -226,6 +226,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
+                className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
               />
             </div>
             
@@ -257,6 +258,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
+                className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
               />
             </div>
 
@@ -270,6 +272,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     list="ingredients-list"
+                    className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
                   />
                   <datalist id="ingredients-list">
                     {!isLoadingIngredients && ingredients
@@ -335,7 +338,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                             newIngredients[index].quantity = e.target.value === '' ? 0 : parseFloat(e.target.value)
                             setSelectedIngredients(newIngredients)
                           }}
-                          className="w-20"
+                          className="w-20 bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
                           min="0"
                           step="0.1"
                         />
@@ -352,7 +355,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                             newIngredients[index].unit = e.target.value
                             setSelectedIngredients(newIngredients)
                           }}
-                          className="h-10 w-24 rounded-md border border-input bg-background px-3 text-sm"
+                          className="h-10 w-24 rounded-md border border-[#98C1B2]/30 bg-white/50 px-3 text-sm focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
                         >
                           <option value="unit">unit</option>
                           <option value="oz">oz</option>
