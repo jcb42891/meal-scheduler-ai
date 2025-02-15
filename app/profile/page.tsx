@@ -140,27 +140,29 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Profile</h1>
       </div>
       
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <h2 className="text-xl font-semibold">Account Details</h2>
-          <div className="flex gap-2">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
+          <h2 className="text-lg sm:text-xl font-semibold">Account Details</h2>
+          <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
             {!isEditing && (
               <>
                 <Button 
                   variant="outline" 
                   onClick={handleResetPassword}
                   disabled={isResetting}
+                  className="w-full sm:w-auto"
                 >
                   {isResetting ? 'Sending...' : 'Reset Password'}
                 </Button>
                 <Button 
                   variant="outline" 
                   onClick={() => setIsEditing(true)}
+                  className="w-full sm:w-auto"
                 >
                   Edit Profile
                 </Button>
@@ -168,33 +170,33 @@ export default function ProfilePage() {
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
+        <CardContent className="space-y-6">
+          <div className="space-y-1">
             <label className="text-sm font-medium text-gray-500">Email</label>
-            <p className="text-gray-900">{user?.email}</p>
+            <p className="text-gray-900 break-all">{user?.email}</p>
           </div>
 
           <div className="space-y-4">
-            <div>
+            <div className="space-y-1">
               <label className="text-sm font-medium text-gray-500">First Name</label>
               {isEditing ? (
                 <Input
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className="mt-1"
+                  className="mt-1 w-full"
                 />
               ) : (
                 <p className="text-gray-900">{profile.first_name || '-'}</p>
               )}
             </div>
 
-            <div>
+            <div className="space-y-1">
               <label className="text-sm font-medium text-gray-500">Last Name</label>
               {isEditing ? (
                 <Input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className="mt-1"
+                  className="mt-1 w-full"
                 />
               ) : (
                 <p className="text-gray-900">{profile.last_name || '-'}</p>
@@ -202,11 +204,19 @@ export default function ProfilePage() {
             </div>
 
             {isEditing && (
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setIsEditing(false)}>
+              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end pt-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsEditing(false)}
+                  className="w-full sm:w-auto"
+                >
                   Cancel
                 </Button>
-                <Button onClick={handleUpdateProfile} disabled={isUpdating}>
+                <Button 
+                  onClick={handleUpdateProfile} 
+                  disabled={isUpdating}
+                  className="w-full sm:w-auto"
+                >
                   {isUpdating ? 'Updating...' : 'Update Profile'}
                 </Button>
               </div>
