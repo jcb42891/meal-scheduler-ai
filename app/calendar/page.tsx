@@ -265,15 +265,19 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const handleDocumentClick = (e: MouseEvent) => {
+      // Don't reset if clicking grocery list button or modal
       if (
-        !(e.target as HTMLElement).closest("[data-day]") && 
-        !(e.target as HTMLElement).closest("[role='dialog']") &&
-        !(e.target as HTMLElement).closest("[data-grocery-button]")
+        (e.target as HTMLElement).closest("[data-day]") || 
+        (e.target as HTMLElement).closest("[role='dialog']") ||
+        (e.target as HTMLElement).closest("[data-grocery-button]")
       ) {
-        setDateRange({ start: null, end: null })
-        setIsSelecting(false)
-        setShowGroceryList(false)
+        return
       }
+
+      // Reset selection and close grocery list
+      setDateRange({ start: null, end: null })
+      setIsSelecting(false)
+      setShowGroceryList(false)
     }
 
     document.addEventListener('click', handleDocumentClick)
@@ -308,6 +312,7 @@ export default function CalendarPage() {
   }
 
   const handleGenerateList = (e: React.MouseEvent) => {
+    e.preventDefault()
     e.stopPropagation()
     setShowGroceryList(true)
   }
@@ -334,20 +339,31 @@ export default function CalendarPage() {
     <div className="min-h-screen bg-[#F5E6D3] p-6 space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight text-[#2F4F4F]">Meal Calendar</h1>
-        <div className={cn("w-[200px] h-10 rounded-md", isLoading && "animate-pulse bg-gray-200")} />
-        <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
-          <SelectTrigger className="w-[200px] bg-white/80 backdrop-blur border-[#98C1B2] text-[#2F4F4F]">
-            <SelectValue placeholder="Select a group" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Select a group">Select a group</SelectItem>
-            {userGroups.map((group) => (
-              <SelectItem key={group.id} value={group.id}>
-                {group.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+          <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+            <SelectTrigger className="w-[200px] bg-white/80 backdrop-blur border-[#98C1B2] text-[#2F4F4F]">
+              <SelectValue placeholder="Select a group" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Select a group">Select a group</SelectItem>
+              {userGroups.map((group) => (
+                <SelectItem key={group.id} value={group.id}>
+                  {group.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {dateRange.start && (
+            <Button
+              onClick={handleGenerateList}
+              data-grocery-button
+              className="bg-[#FF9B76] hover:bg-[#FF9B76]/90 text-white font-medium px-6 py-2 rounded-full shadow-md hover:shadow-lg transition-all duration-200"
+            >
+              Generate Grocery List
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="rounded-2xl border border-[#98C1B2] bg-white/80 backdrop-blur shadow-lg">
@@ -580,25 +596,13 @@ export default function CalendarPage() {
       )}
 
       {dateRange.start && (
-        <>
-          <div className="mt-6 flex justify-end">
-            <Button
-              onClick={handleGenerateList}
-              data-grocery-button
-              className="bg-[#FF9B76] hover:bg-[#FF9B76]/90 text-white font-medium px-6 py-2 rounded-full shadow-md hover:shadow-lg transition-all duration-200"
-            >
-              Generate Grocery List
-            </Button>
-          </div>
-
-          <GroceryListModal
-            open={showGroceryList}
-            onOpenChange={setShowGroceryList}
-            groupId={selectedGroupId}
-            startDate={dateRange.start}
-            endDate={dateRange.end || dateRange.start}
-          />
-        </>
+        <GroceryListModal
+          open={showGroceryList}
+          onOpenChange={setShowGroceryList}
+          groupId={selectedGroupId}
+          startDate={dateRange.start}
+          endDate={dateRange.end || dateRange.start}
+        />
       )}
     </div>
   )
