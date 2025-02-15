@@ -57,6 +57,7 @@ export default function CalendarPage() {
   const [isSelecting, setIsSelecting] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
+  const [isMonthLoading, setIsMonthLoading] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -126,48 +127,74 @@ export default function CalendarPage() {
     }
   }
 
-  const fetchCalendarMeals = async () => {
-    if (!selectedGroupId) return
-
-    const startDate = startOfMonth(currentDate)
-    const endDate = endOfMonth(currentDate)
-
-    const { data, error } = await supabase
-      .from("meal_calendar")
-      .select(`
-        date,
-        meal:meals(id, name, category)
-      `)
-      .eq("group_id", selectedGroupId)
-      .gte("date", startDate.toISOString())
-      .lte("date", endDate.toISOString())
-      .returns<MealCalendarResponse[]>()
-
-    if (error) {
-      toast.error("Failed to load calendar meals")
-      return
-    }
-
-    const mealsMap: Record<string, { id: string; name: string; category: string }> = {}
-    data.forEach((item) => {
-      mealsMap[item.date] = item.meal
-    })
-    setCalendarMeals(mealsMap)
-  }
-
   useEffect(() => {
+    let mounted = true
+
     if (selectedGroupId) {
-      fetchCalendarMeals()
+      const fetchMeals = async () => {
+        if (!mounted) return
+        setIsMonthLoading(true)
+        
+        try {
+          const start = startOfMonth(currentDate)
+          const end = endOfMonth(currentDate)
+          
+          const { data, error } = await supabase
+            .from('meal_calendar')
+            .select('date, meal:meals(id, name, category)')
+            .eq('group_id', selectedGroupId)
+            .gte('date', start.toISOString().split('T')[0])
+            .lte('date', end.toISOString().split('T')[0])
+
+          if (!mounted) return
+          if (error) throw error
+
+          const meals = data.reduce((acc, item) => ({
+            ...acc,
+            [item.date]: item.meal
+          }), {})
+
+          setCalendarMeals(meals)
+        } catch (error) {
+          console.error('Error fetching calendar meals:', error)
+          if (mounted) {
+            toast.error('Failed to load meals')
+          }
+        } finally {
+          if (mounted) {
+            setIsMonthLoading(false)
+          }
+        }
+      }
+
+      fetchMeals()
     }
-  }, [selectedGroupId, currentDate, fetchCalendarMeals]) // Added fetchCalendarMeals to dependencies
+
+    return () => {
+      mounted = false
+    }
+  }, [selectedGroupId, currentDate])
 
   const days = eachDayOfInterval({
     start: startOfWeek(startOfMonth(currentDate)),
     end: endOfWeek(endOfMonth(currentDate)),
   })
 
-  const previousMonth = () => setCurrentDate(subMonths(currentDate, 1))
-  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1))
+  const handlePrevMonth = async () => {
+    setIsMonthLoading(true)
+    setCurrentDate(prevDate => {
+      const newDate = subMonths(prevDate, 1)
+      return newDate
+    })
+  }
+
+  const handleNextMonth = async () => {
+    setIsMonthLoading(true)
+    setCurrentDate(prevDate => {
+      const newDate = addMonths(prevDate, 1)
+      return newDate
+    })
+  }
 
   const deleteMeal = async (dateStr: string) => {
     if (!selectedGroupId) return
@@ -182,7 +209,6 @@ export default function CalendarPage() {
       if (error) throw error
 
       toast.success("Meal removed")
-      fetchCalendarMeals()
     } catch (error) {
       console.error("Error removing meal:", error)
       toast.error("Failed to remove meal")
@@ -299,17 +325,23 @@ export default function CalendarPage() {
             <>
               {/* Calendar header */}
               <div className="flex items-center justify-between mb-6">
-                <Button variant="ghost" onClick={previousMonth} className="hover:text-[#2F4F4F] hover:bg-[#98C1B2]/20">
+                <Button variant="ghost" onClick={handlePrevMonth} className="hover:text-[#2F4F4F] hover:bg-[#98C1B2]/20" disabled={isMonthLoading}>
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
                 <h2 className="text-2xl font-semibold text-[#2F4F4F]">{format(currentDate, "MMMM yyyy")}</h2>
-                <Button variant="ghost" onClick={nextMonth} className="hover:text-[#2F4F4F] hover:bg-[#98C1B2]/20">
+                <Button variant="ghost" onClick={handleNextMonth} className="hover:text-[#2F4F4F] hover:bg-[#98C1B2]/20" disabled={isMonthLoading}>
                   <ChevronRight className="h-5 w-5" />
                 </Button>
               </div>
 
               {/* Calendar grid */}
-              <div className="grid grid-cols-7 gap-px bg-[#98C1B2]/20 rounded-lg overflow-hidden">
+              <div className="grid grid-cols-7 gap-px bg-[#98C1B2]/20 rounded-lg overflow-hidden relative">
+                {isMonthLoading && (
+                  <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full animate-pulse bg-[#98C1B2]/40" />
+                  </div>
+                )}
+                
                 {/* Day headers */}
                 {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
                   <div key={day} className="bg-[#98C1B2]/10 p-3 text-center text-sm font-medium text-[#2F4F4F]">
@@ -406,7 +438,7 @@ export default function CalendarPage() {
           onOpenChange={setShowAddMeal}
           groupId={selectedGroupId}
           date={selectedDate}
-          onMealAdded={fetchCalendarMeals}
+          onMealAdded={() => {}}
         />
       )}
 
