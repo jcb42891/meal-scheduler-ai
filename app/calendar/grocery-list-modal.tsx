@@ -21,6 +21,20 @@ type IngredientTotal = {
   unit: string
 }
 
+type MealIngredient = {
+  quantity: number
+  unit: string
+  ingredient: {
+    name: string
+  }
+}
+
+type MealCalendarEntry = {
+  meal: {
+    meal_ingredients: MealIngredient[]
+  }
+}
+
 export function GroceryListModal({ open, onOpenChange, groupId, startDate, endDate }: Props) {
   const [ingredients, setIngredients] = useState<Record<string, IngredientTotal>>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -48,6 +62,7 @@ export function GroceryListModal({ open, onOpenChange, groupId, startDate, endDa
         .eq('group_id', groupId)
         .gte('date', startDate.toISOString().split('T')[0])
         .lte('date', endDate.toISOString().split('T')[0])
+        .returns<MealCalendarEntry[]>()
 
       if (error) throw error
 

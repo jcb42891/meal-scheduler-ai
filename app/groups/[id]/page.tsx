@@ -1,5 +1,10 @@
 import { GroupManageClient } from './client-component'
+import { PageProps } from '@/.next/types/app/groups/[id]/page'
 
-export default function GroupManagePage({ params }: { params: { id: string } }) {
+type GroupPageProps = PageProps & {
+  params: { id: string }
+}
+
+export default function GroupManagePage({ params }: GroupPageProps) {
   return <GroupManageClient groupId={params.id} />
 } 

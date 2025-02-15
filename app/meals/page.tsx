@@ -23,6 +23,11 @@ import { EditMealDialog } from './edit-meal-dialog'
 import { cn } from '@/lib/utils'
 import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
 
+type Group = {
+  id: string
+  name: string
+}
+
 type Meal = {
   id: string
   name: string
@@ -73,6 +78,7 @@ export default function MealsPage() {
       .from('group_members')
       .select('group:groups(id, name)')
       .eq('user_id', user.id)
+      .returns<{ group: Group }[]>()
 
     if (memberError) {
       console.error('Error fetching member groups:', memberError)
@@ -83,7 +89,10 @@ export default function MealsPage() {
     // Combine and deduplicate groups
     const allGroups = [
       ...ownedGroups,
-      ...memberGroups.map(m => m.group)
+      ...memberGroups.map(m => ({
+        id: m.group.id,
+        name: m.group.name
+      }))
     ].filter((group, index, self) => 
       index === self.findIndex((g) => g.id === group.id)
     )
