@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { Input } from '@/components/ui/input'
 
 type Meal = {
   id: string
@@ -24,6 +25,7 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
   const [meals, setMeals] = useState<Meal[]>([])
   const [selectedMealId, setSelectedMealId] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     if (open && groupId) {
@@ -73,6 +75,10 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
     }
   }
 
+  const filteredMeals = meals.filter(meal => 
+    meal.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] flex flex-col">
@@ -82,23 +88,40 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
 
         <div className="flex-1 overflow-y-auto pr-2">
           <form id="add-meal-form" onSubmit={handleSubmit} className="space-y-4">
+            <div className="relative">
+              <Input
+                type="search"
+                placeholder="Search meals..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
+              />
+            </div>
+
             <div className="grid gap-4">
-              {meals.map((meal) => (
+              {filteredMeals.map((meal) => (
                 <div
                   key={meal.id}
-                  className={`p-4 rounded-lg border cursor-pointer hover:bg-[#98C1B2]/5 ${
+                  className={`p-3 rounded-lg border cursor-pointer hover:bg-[#98C1B2]/5 ${
                     selectedMealId === meal.id ? 'border-[#98C1B2] bg-[#98C1B2]/10' : 'border-[#98C1B2]/30'
                   }`}
                   onClick={() => setSelectedMealId(meal.id)}
                 >
-                  <h3 className="font-medium">{meal.name}</h3>
-                  {meal.category && (
-                    <span className="text-sm text-muted-foreground">
-                      {meal.category}
-                    </span>
-                  )}
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium">{meal.name}</h3>
+                    {meal.category && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-[#98C1B2]/10 text-[#2F4F4F]">
+                        {meal.category}
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
+              {filteredMeals.length === 0 && (
+                <p className="text-center text-muted-foreground py-4">
+                  No meals found matching "{searchTerm}"
+                </p>
+              )}
             </div>
           </form>
         </div>
