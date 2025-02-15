@@ -22,6 +22,7 @@ import { Trash2, Pencil } from 'lucide-react'
 import { EditMealDialog } from './edit-meal-dialog'
 import { cn } from '@/lib/utils'
 import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
+import { Input } from '@/components/ui/input'
 
 type Group = {
   id: string
@@ -47,6 +48,7 @@ export default function MealsPage() {
   const [mealToDelete, setMealToDelete] = useState<Meal | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [mealToEdit, setMealToEdit] = useState<Meal | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     if (!user) {
@@ -144,6 +146,10 @@ export default function MealsPage() {
     }
   }
 
+  const filteredMeals = meals.filter(meal => 
+    meal.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -167,18 +173,31 @@ export default function MealsPage() {
 
       <Card>
         <CardHeader>
-          <h2 className="text-xl font-semibold">Your Meals</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Your Meals</h2>
+            <div className="w-72">
+              <Input
+                type="search"
+                placeholder="Search meals..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
             <p className="text-muted-foreground">Loading meals...</p>
-          ) : meals.length === 0 && selectedGroupId ? (
-            <p className="text-muted-foreground">No meals have been created for this group yet.</p>
+          ) : filteredMeals.length === 0 && selectedGroupId ? (
+            <p className="text-muted-foreground">
+              {searchTerm ? `No meals found matching "${searchTerm}"` : 'No meals have been created for this group yet.'}
+            </p>
           ) : !selectedGroupId ? (
             <p className="text-muted-foreground">Select a group to view meals</p>
           ) : (
             <div className="space-y-4">
-              {meals.map((meal) => (
+              {filteredMeals.map((meal) => (
                 <div
                   key={meal.id}
                   className="flex items-center justify-between p-4 border rounded-lg"
