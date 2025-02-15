@@ -224,6 +224,29 @@ export default function CalendarPage() {
 
       if (error) throw error
 
+      // Fetch updated meals for the current week/month
+      const start = window.innerWidth >= 640 
+        ? startOfMonth(currentDate)
+        : mobileWeekStart
+      const end = window.innerWidth >= 640
+        ? endOfMonth(currentDate)
+        : endOfWeek(mobileWeekStart)
+
+      const { data: updatedData, error: fetchError } = await supabase
+        .from('meal_calendar')
+        .select('date, meal:meals(id, name, category)')
+        .eq('group_id', selectedGroupId)
+        .gte('date', start.toISOString().split('T')[0])
+        .lte('date', end.toISOString().split('T')[0])
+
+      if (fetchError) throw fetchError
+
+      const meals = updatedData.reduce((acc, item) => ({
+        ...acc,
+        [item.date]: item.meal
+      }), {})
+
+      setCalendarMeals(meals)
       toast.success("Meal removed")
     } catch (error) {
       console.error("Error removing meal:", error)
@@ -309,7 +332,7 @@ export default function CalendarPage() {
 
       <div className="rounded-2xl border border-[#98C1B2] bg-white/80 backdrop-blur shadow-lg">
         <div className="p-4 sm:p-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-8">
             <Button 
               variant="ghost" 
               onClick={() => {
@@ -320,10 +343,11 @@ export default function CalendarPage() {
                 }
               }} 
               disabled={isMonthLoading}
+              className="shrink-0 px-1 sm:px-4"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <h2 className="text-2xl font-semibold text-[#2F4F4F]">
+            <h2 className="text-base sm:text-2xl font-semibold text-[#2F4F4F] mx-2 truncate">
               <span className="hidden sm:inline">
                 {format(currentDate, "MMMM yyyy")}
               </span>
@@ -341,6 +365,7 @@ export default function CalendarPage() {
                 }
               }}
               disabled={isMonthLoading}
+              className="shrink-0 px-1 sm:px-4"
             >
               <ChevronRight className="h-5 w-5" />
             </Button>
@@ -348,6 +373,9 @@ export default function CalendarPage() {
 
           <div className="hidden sm:block">
             <div className="grid grid-cols-7 gap-px bg-[#98C1B2]/20 rounded-lg overflow-hidden relative">
+              {isMonthLoading && (
+                <div className="absolute inset-0 bg-white/80 z-10 transition-opacity duration-200" />
+              )}
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
                 <div key={day} className="bg-[#98C1B2]/10 p-3 text-center text-sm font-medium text-[#2F4F4F]">
                   {day}
@@ -377,45 +405,36 @@ export default function CalendarPage() {
                         {format(day, "d")}
                       </span>
                       {selectedGroupId && (
-                        meal ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-red-500 hover:text-red-600"
-                            onClick={(e) => {
-                              e.stopPropagation()
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "h-7 w-7",
+                            meal ? "text-red-500 hover:text-red-600" : ""
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (meal) {
                               deleteMeal(dateStr)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDateClick(day, e)
-                            }}
-                          >
-                            <PlusCircle className="h-4 w-4" />
-                          </Button>
-                        )
+                            } else {
+                              setSelectedDate(day)
+                              setShowAddMeal(true)
+                            }
+                          }}
+                        >
+                          {meal ? <Trash2 className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
+                        </Button>
                       )}
                     </div>
                     
                     {meal && (
-                      <div className="mt-1">
-                        <div className="text-sm font-medium truncate">
+                      <div className={cn(
+                        "mt-1 p-2 rounded-md",
+                        getCategoryColor(meal.category as MealCategory)
+                      )}>
+                        <div className="text-sm font-medium">
                           {meal.name}
                         </div>
-                        <span className={cn(
-                          'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium mt-1',
-                          getCategoryColor(meal.category as MealCategory)
-                        )}>
-                          {meal.category}
-                        </span>
                       </div>
                     )}
                   </div>
@@ -425,7 +444,10 @@ export default function CalendarPage() {
           </div>
 
           <div className="sm:hidden">
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 relative">
+              {isMonthLoading && (
+                <div className="absolute inset-0 bg-white/80 z-10 transition-opacity duration-200" />
+              )}
               {mobileDays.map((day) => {
                 const dateStr = format(day, "yyyy-MM-dd")
                 const meal = calendarMeals[dateStr]
@@ -453,46 +475,36 @@ export default function CalendarPage() {
                         </span>
                       </div>
                       {selectedGroupId && (
-                        meal ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-500 hover:text-red-600"
-                            onClick={(e) => {
-                              e.stopPropagation()
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn(
+                            "h-8 w-8",
+                            meal ? "text-red-500 hover:text-red-600" : ""
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (meal) {
                               deleteMeal(dateStr)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation()
+                            } else {
                               setSelectedDate(day)
                               setShowAddMeal(true)
-                            }}
-                          >
-                            <PlusCircle className="h-4 w-4" />
-                          </Button>
-                        )
+                            }
+                          }}
+                        >
+                          {meal ? <Trash2 className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
+                        </Button>
                       )}
                     </div>
                     
                     {meal && (
-                      <div className="mt-2">
+                      <div className={cn(
+                        "mt-2 p-2 rounded-md",
+                        getCategoryColor(meal.category as MealCategory)
+                      )}>
                         <div className="text-sm font-medium">
                           {meal.name}
                         </div>
-                        <span className={cn(
-                          'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium mt-1',
-                          getCategoryColor(meal.category as MealCategory)
-                        )}>
-                          {meal.category}
-                        </span>
                       </div>
                     )}
                   </div>
