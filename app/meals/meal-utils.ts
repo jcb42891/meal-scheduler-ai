@@ -13,9 +13,9 @@ export const getCategoryColor = (category: MealCategory) => {
     case MEAL_CATEGORIES.POULTRY:
       return 'bg-amber-100 text-amber-800'
     case MEAL_CATEGORIES.BEEF:
-      return 'bg-red-100 text-red-800'
+      return 'bg-red-100 text-red-900'
     case MEAL_CATEGORIES.PORK:
-      return 'bg-rose-100 text-rose-800'
+      return 'bg-orange-100 text-orange-800'
     case MEAL_CATEGORIES.FISH:
       return 'bg-blue-100 text-blue-800'
     case MEAL_CATEGORIES.VEGETARIAN:
