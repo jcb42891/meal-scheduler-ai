@@ -18,10 +18,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={GeistSans.className}>
       <head />
-      <body className="min-h-screen bg-[#F5E6D3]">
+      <body className="min-h-screen bg-background">
         <AuthProvider>
           <Navbar />
-          <main className="container mx-auto px-4 py-6">
+          <main className="container mx-auto px-4 py-5">
             {children}
           </main>
           <Toaster />

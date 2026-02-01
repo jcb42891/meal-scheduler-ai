@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
+import { Chip } from '@/components/ui/chip'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -18,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Trash2, Pencil } from 'lucide-react'
+import { Trash2, Pencil, Search } from 'lucide-react'
 import { EditMealDialog } from './edit-meal-dialog'
 import { cn } from '@/lib/utils'
 import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
@@ -154,14 +156,17 @@ export default function MealsPage() {
   })
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Meal Library</h1>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Meal Library</h1>
+          <p className="text-sm text-muted-foreground">Browse and manage meals for your household.</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <select
             value={selectedGroupId}
             onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="h-10 w-full sm:w-[200px] rounded-md border border-input bg-background px-3 text-sm"
+            className="h-10 w-full sm:w-[220px] rounded-[10px] border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
           >
             <option value="">Select a group</option>
             {userGroups.map((group) => (
@@ -177,21 +182,24 @@ export default function MealsPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <h2 className="text-xl font-semibold">Your Meals</h2>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-lg font-semibold">Your Meals</h2>
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-              <Input
-                type="search"
-                placeholder="Search meals..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20 sm:w-64"
-              />
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search meals..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9"
+                />
+              </div>
               <select
                 value={selectedCategory}
                 onChange={(event) => setSelectedCategory(event.target.value)}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-48"
+                className="h-10 w-full rounded-[10px] border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background sm:w-48"
               >
                 <option value="">All categories</option>
                 {Object.values(MEAL_CATEGORIES).map((category) => (
@@ -203,61 +211,90 @@ export default function MealsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           {loading ? (
-            <p className="text-muted-foreground">Loading meals...</p>
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="rounded-xl border border-border/60 bg-card p-3 shadow-sm"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-2 flex-1">
+                      <div className="h-4 w-40 rounded-full bg-surface-2 animate-pulse" />
+                      <div className="h-3 w-64 rounded-full bg-surface-2 animate-pulse" />
+                    </div>
+                    <div className="h-6 w-16 rounded-full bg-surface-2 animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : filteredMeals.length === 0 && selectedGroupId ? (
-            <p className="text-muted-foreground">
-              {searchTerm && selectedCategory ? (
-                <>
-                  No meals found matching &quot;{searchTerm}&quot; in {selectedCategory}
-                </>
-              ) : searchTerm ? (
-                <>No meals found matching &quot;{searchTerm}&quot;</>
-              ) : selectedCategory ? (
-                <>No meals found in {selectedCategory}</>
-              ) : (
-                'No meals have been created for this group yet.'
+            <div className="rounded-xl border border-border/60 bg-surface-2/70 p-6 text-center shadow-sm">
+              <p className="text-sm text-muted-foreground">
+                {searchTerm && selectedCategory ? (
+                  <>
+                    No meals found matching &quot;{searchTerm}&quot; in {selectedCategory}.
+                  </>
+                ) : searchTerm ? (
+                  <>No meals found matching &quot;{searchTerm}&quot;.</>
+                ) : selectedCategory ? (
+                  <>No meals found in {selectedCategory}.</>
+                ) : (
+                  'No meals have been created for this group yet.'
+                )}
+              </p>
+              {!searchTerm && !selectedCategory && (
+                <Button
+                  onClick={() => setShowCreateDialog(true)}
+                  className="mt-4"
+                >
+                  Create Meal
+                </Button>
               )}
-            </p>
+            </div>
           ) : !selectedGroupId ? (
-            <p className="text-muted-foreground">Select a group to view meals</p>
+            <div className="rounded-xl border border-border/60 bg-surface-2/70 p-6 text-center text-sm text-muted-foreground shadow-sm">
+              Select a group to view meals.
+            </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {filteredMeals.map((meal) => (
                 <div
                   key={meal.id}
-                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-lg gap-4"
+                  className="group rounded-xl border border-border/60 bg-card p-3 shadow-sm transition-colors hover:bg-surface-2/60 hover:shadow-md focus-within:shadow-md"
                 >
-                  <div className="w-full sm:w-auto">
-                    <h3 className="font-medium">{meal.name}</h3>
-                    <p className="text-sm text-muted-foreground">{meal.description}</p>
-                    {meal.category && (
-                      <span className={cn(
-                        'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium mt-2 sm:mt-1',
-                        getCategoryColor(meal.category as MealCategory)
-                      )}>
-                        {meal.category}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setMealToEdit(meal)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setMealToDelete(meal)}
-                      className="text-destructive hover:text-destructive/90"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <h3 className="text-base font-medium">{meal.name}</h3>
+                      {meal.description && (
+                        <p className="text-sm text-muted-foreground sm:max-w-md truncate">
+                          {meal.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
+                      {meal.category && (
+                        <Chip className={cn("text-xs", getCategoryColor(meal.category as MealCategory))}>
+                          {meal.category}
+                        </Chip>
+                      )}
+                      <div className="flex items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                        <IconButton
+                          aria-label={`Edit ${meal.name}`}
+                          onClick={() => setMealToEdit(meal)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </IconButton>
+                        <IconButton
+                          aria-label={`Delete ${meal.name}`}
+                          variant="destructive"
+                          onClick={() => setMealToDelete(meal)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </IconButton>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
