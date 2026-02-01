@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
+import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -236,7 +236,7 @@ export default function AuthPage() {
           <form onSubmit={handleForgotPassword} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-500">
-                Enter your email address and we'll send you a link to reset your password.
+                Enter your email address and we will send you a link to reset your password.
               </label>
               <Input
                 type="email"

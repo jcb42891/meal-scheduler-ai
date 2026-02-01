@@ -38,7 +38,6 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [selectedIngredients, setSelectedIngredients] = useState<MealIngredient[]>([])
-  const [newIngredient, setNewIngredient] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -266,7 +265,7 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
                         }}
                         className="text-destructive hover:text-destructive/90"
                       >
-                        ×
+                        x
                       </Button>
                     </div>
                   </div>

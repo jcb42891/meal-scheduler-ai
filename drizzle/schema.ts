@@ -1,5 +1,11 @@
-import { pgTable, foreignKey, pgPolicy, uuid, text, timestamp, unique, date, primaryKey, numeric } from "drizzle-orm/pg-core"
+import { pgTable, pgSchema, foreignKey, pgPolicy, uuid, text, timestamp, unique, date, primaryKey, numeric } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
+
+const auth = pgSchema("auth");
+
+export const usersInAuth = auth.table("users", {
+	id: uuid("id").notNull(),
+});
 
 
 
@@ -11,7 +17,7 @@ export const groups = pgTable("groups", {
 }, (table) => [
 	foreignKey({
 			columns: [table.owner_id],
-			foreignColumns: [users.id],
+			foreignColumns: [usersInAuth.id],
 			name: "groups_owner_id_fkey"
 		}),
 	pgPolicy("Authenticated users can create groups", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(auth.uid() = owner_id)`  }),
@@ -29,7 +35,7 @@ export const profiles = pgTable("profiles", {
 }, (table) => [
 	foreignKey({
 			columns: [table.id],
-			foreignColumns: [users.id],
+			foreignColumns: [usersInAuth.id],
 			name: "profiles_id_fkey"
 		}).onDelete("cascade"),
 	pgPolicy("Enable delete for users based on id", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = id)` }),
@@ -88,7 +94,7 @@ export const group_invitations = pgTable("group_invitations", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.invited_by],
-			foreignColumns: [users.id],
+			foreignColumns: [usersInAuth.id],
 			name: "group_invitations_invited_by_fkey"
 		}),
 	pgPolicy("Anyone can view their own invitations", { as: "permissive", for: "select", to: ["public"], using: sql`((email = (auth.jwt() ->> 'email'::text)) OR (invited_by = auth.uid()) OR (EXISTS ( SELECT 1
@@ -109,7 +115,7 @@ export const meals = pgTable("meals", {
 }, (table) => [
 	foreignKey({
 			columns: [table.created_by],
-			foreignColumns: [users.id],
+			foreignColumns: [usersInAuth.id],
 			name: "meals_created_by_fkey"
 		}),
 	foreignKey({

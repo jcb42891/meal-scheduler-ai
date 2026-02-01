@@ -21,7 +21,7 @@ import {
 import { Trash2, Pencil } from 'lucide-react'
 import { EditMealDialog } from './edit-meal-dialog'
 import { cn } from '@/lib/utils'
-import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
+import { MealCategory, getCategoryColor } from './meal-utils'
 import { Input } from '@/components/ui/input'
 
 type Group = {
@@ -193,7 +193,11 @@ export default function MealsPage() {
             <p className="text-muted-foreground">Loading meals...</p>
           ) : filteredMeals.length === 0 && selectedGroupId ? (
             <p className="text-muted-foreground">
-              {searchTerm ? `No meals found matching "${searchTerm}"` : 'No meals have been created for this group yet.'}
+              {searchTerm ? (
+                <>No meals found matching &quot;{searchTerm}&quot;</>
+              ) : (
+                'No meals have been created for this group yet.'
+              )}
             </p>
           ) : !selectedGroupId ? (
             <p className="text-muted-foreground">Select a group to view meals</p>
@@ -260,7 +264,7 @@ export default function MealsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the meal "{mealToDelete?.name}".
+              This will permanently delete the meal &quot;{mealToDelete?.name}&quot;.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

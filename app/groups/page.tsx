@@ -171,7 +171,7 @@ export default function GroupsPage() {
       ) : groups.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            <p>You haven't joined any groups yet.</p>
+            <p>You have not joined any groups yet.</p>
             <p>Create a group to get started!</p>
           </CardContent>
         </Card>
@@ -254,7 +254,7 @@ export default function GroupsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the group "{groupToDelete?.name}" and all associated data.
+              This will permanently delete the group &quot;{groupToDelete?.name}&quot; and all associated data.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

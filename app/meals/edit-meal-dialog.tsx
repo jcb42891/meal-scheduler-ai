@@ -31,14 +31,6 @@ type MealIngredient = {
 }
 
 // Add this type to match Supabase's response
-type MealIngredientResponse = {
-  quantity: number
-  unit: string
-  ingredient: {
-    id: string
-    name: string
-  }[]
-}
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -54,7 +46,6 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [selectedIngredients, setSelectedIngredients] = useState<MealIngredient[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [isLoadingIngredients, setIsLoadingIngredients] = useState(true)
 
   // Load meal data when opened
   useEffect(() => {
@@ -99,7 +90,6 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
   // Load available ingredients
   useEffect(() => {
     const fetchIngredients = async () => {
-      setIsLoadingIngredients(true)
       try {
         const { data, error } = await supabase
           .from('ingredients')
@@ -110,7 +100,6 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
           setIngredients(data || [])
         }
       } finally {
-        setIsLoadingIngredients(false)
       }
     }
 
@@ -369,7 +358,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                         }}
                         className="text-destructive hover:text-destructive/90"
                       >
-                        ×
+                        x
                       </Button>
                     </div>
                   </div>

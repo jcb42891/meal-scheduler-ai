@@ -40,56 +40,56 @@ export function GroceryListModal({ open, onOpenChange, groupId, startDate, endDa
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (open) {
-      fetchIngredients()
-    }
-  }, [open, groupId, startDate, endDate])
+    if (!open) return
 
-  const fetchIngredients = async () => {
-    setIsLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('meal_calendar')
-        .select(`
-          meal:meals(
-            meal_ingredients(
-              quantity,
-              unit,
-              ingredient:ingredients(name)
+    const fetchIngredients = async () => {
+      setIsLoading(true)
+      try {
+        const { data, error } = await supabase
+          .from('meal_calendar')
+          .select(`
+            meal:meals(
+              meal_ingredients(
+                quantity,
+                unit,
+                ingredient:ingredients(name)
+              )
             )
-          )
-        `)
-        .eq('group_id', groupId)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0])
-        .returns<MealCalendarEntry[]>()
+          `)
+          .eq('group_id', groupId)
+          .gte('date', startDate.toISOString().split('T')[0])
+          .lte('date', endDate.toISOString().split('T')[0])
+          .returns<MealCalendarEntry[]>()
 
-      if (error) throw error
+        if (error) throw error
 
-      // Aggregate ingredients
-      const totals: Record<string, IngredientTotal> = {}
-      data.forEach(entry => {
-        entry.meal.meal_ingredients.forEach((mi: any) => {
-          const key = `${mi.ingredient.name}-${mi.unit}`
-          if (!totals[key]) {
-            totals[key] = {
-              name: mi.ingredient.name,
-              total: 0,
-              unit: mi.unit
+        // Aggregate ingredients
+        const totals: Record<string, IngredientTotal> = {}
+        data.forEach(entry => {
+          entry.meal.meal_ingredients.forEach((mi) => {
+            const key = `${mi.ingredient.name}-${mi.unit}`
+            if (!totals[key]) {
+              totals[key] = {
+                name: mi.ingredient.name,
+                total: 0,
+                unit: mi.unit
+              }
             }
-          }
-          totals[key].total += mi.quantity
+            totals[key].total += mi.quantity
+          })
         })
-      })
 
-      setIngredients(totals)
-    } catch (error) {
-      console.error('Error fetching ingredients:', error)
-      toast.error('Failed to generate grocery list')
-    } finally {
-      setIsLoading(false)
+        setIngredients(totals)
+      } catch (error) {
+        console.error('Error fetching ingredients:', error)
+        toast.error('Failed to generate grocery list')
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }
+
+    fetchIngredients()
+  }, [open, groupId, startDate, endDate])
 
   const copyToClipboard = () => {
     const text = Object.values(ingredients)

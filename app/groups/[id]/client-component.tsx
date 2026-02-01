@@ -86,12 +86,13 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
   const fetchMembers = async () => {
     const { data, error } = await supabase
       .from('group_members')
-      .select<any, MemberWithProfile>(`
+      .select(`
         user_id,
         role,
         profile:profiles!user_id(email)
       `)
       .eq('group_id', groupId)
+      .returns<MemberWithProfile[]>()
 
     if (error) {
       toast.error('Failed to load members')

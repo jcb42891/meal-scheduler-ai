@@ -28,25 +28,25 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    if (open && groupId) {
-      fetchMeals()
+    if (!open || !groupId) return
+
+    const fetchMeals = async () => {
+      const { data, error } = await supabase
+        .from('meals')
+        .select('id, name, category')
+        .eq('group_id', groupId)
+        .order('name')
+
+      if (error) {
+        toast.error('Failed to load meals')
+        return
+      }
+
+      setMeals(data || [])
     }
+
+    fetchMeals()
   }, [open, groupId])
-
-  const fetchMeals = async () => {
-    const { data, error } = await supabase
-      .from('meals')
-      .select('id, name, category')
-      .eq('group_id', groupId)
-      .order('name')
-
-    if (error) {
-      toast.error('Failed to load meals')
-      return
-    }
-
-    setMeals(data || [])
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -119,7 +119,7 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
               ))}
               {filteredMeals.length === 0 && (
                 <p className="text-center text-muted-foreground py-4">
-                  No meals found matching "{searchTerm}"
+                  No meals found matching &quot;{searchTerm}&quot;
                 </p>
               )}
             </div>

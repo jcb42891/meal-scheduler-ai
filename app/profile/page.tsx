@@ -19,7 +19,6 @@ export default function ProfilePage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile>({ first_name: '', last_name: '' })
   const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [firstName, setFirstName] = useState('')
@@ -33,7 +32,7 @@ export default function ProfilePage() {
 
     // Fetch profile data
     const fetchProfile = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('first_name, last_name')
         .eq('id', user.id)
@@ -48,37 +47,6 @@ export default function ProfilePage() {
 
     fetchProfile()
   }, [user, router])
-
-  const handleSave = async () => {
-    if (!user) return
-
-    setIsSaving(true)
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          first_name: profile.first_name,
-          last_name: profile.last_name,
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single()
-
-      if (error) {
-        console.error('Error saving profile:', error)
-        alert('Failed to save profile')
-      } else {
-        console.log('Profile saved:', data)
-        setIsEditing(false)
-      }
-    } catch (err) {
-      console.error('Error:', err)
-      alert('An error occurred')
-    } finally {
-      setIsSaving(false)
-    }
-  }
 
   const handleResetPassword = async () => {
     if (!user?.email) return

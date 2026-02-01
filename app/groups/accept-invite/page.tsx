@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -8,8 +8,6 @@ import { toast } from 'sonner'
 function AcceptInviteContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [isProcessing, setIsProcessing] = useState(true)
-
   useEffect(() => {
     const processInvite = async () => {
       const token = searchParams.get('token')
@@ -82,7 +80,6 @@ function AcceptInviteContent() {
         toast.error('Failed to process invitation')
         router.push('/')
       } finally {
-        setIsProcessing(false)
       }
     }
 

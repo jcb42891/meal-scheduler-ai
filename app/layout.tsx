@@ -4,9 +4,6 @@ import { Navbar } from '@/app/components/navbar'
 import './globals.css'
 import { Toaster } from 'sonner'
 import { GeistSans } from 'geist/font/sans'
-import { Playfair_Display } from 'next/font/google'
-
-const playfair = Playfair_Display({ subsets: ['latin'] })
 
 export const metadata = {
   title: 'Pantry Planner',

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuth } from "@/lib/contexts/AuthContext"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, PlusCircle, Trash2 } from "lucide-react"
@@ -34,17 +33,7 @@ type GroupMember = {
   }
 }
 
-type MealCalendarResponse = {
-  date: string
-  meal: {
-    id: string
-    name: string
-    category: string
-  }
-}
-
 export default function CalendarPage() {
-  const { user } = useAuth()
   const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [userGroups, setUserGroups] = useState<{ id: string; name: string }[]>([])
@@ -57,8 +46,6 @@ export default function CalendarPage() {
     end: Date | null
   }>({ start: null, end: null })
   const [showGroceryList, setShowGroceryList] = useState(false)
-  const [isSelecting, setIsSelecting] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [isMonthLoading, setIsMonthLoading] = useState(false)
   const [mobileWeekStart, setMobileWeekStart] = useState(startOfWeek(new Date()))
@@ -82,7 +69,6 @@ export default function CalendarPage() {
   }, [router])
 
   const fetchUserGroups = async () => {
-    setIsLoading(true)
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser()
       if (!currentUser) return
@@ -127,7 +113,6 @@ export default function CalendarPage() {
         setSelectedGroupId(allGroups[0].id)
       }
     } finally {
-      setIsLoading(false)
     }
   }
 
@@ -276,7 +261,6 @@ export default function CalendarPage() {
 
       // Reset selection and close grocery list
       setDateRange({ start: null, end: null })
-      setIsSelecting(false)
       setShowGroceryList(false)
     }
 
@@ -293,7 +277,6 @@ export default function CalendarPage() {
     if (!dateRange.start) {
       // First click - set start date
       setDateRange({ start: date, end: null })
-      setIsSelecting(true)
       setShowGroceryList(false)
     } else if (!dateRange.end) {
       // Second click - set end date and ensure correct order
@@ -302,11 +285,9 @@ export default function CalendarPage() {
         start: start <= date ? start : date,
         end: start <= date ? date : start
       })
-      setIsSelecting(false)
     } else {
       // Reset and start new selection
       setDateRange({ start: date, end: null })
-      setIsSelecting(true)
       setShowGroceryList(false)
     }
   }
