@@ -21,7 +21,7 @@ import {
 import { Trash2, Pencil } from 'lucide-react'
 import { EditMealDialog } from './edit-meal-dialog'
 import { cn } from '@/lib/utils'
-import { MealCategory, getCategoryColor } from './meal-utils'
+import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
 import { Input } from '@/components/ui/input'
 
 type Group = {
@@ -49,6 +49,7 @@ export default function MealsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [mealToEdit, setMealToEdit] = useState<Meal | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('')
 
   useEffect(() => {
     if (!user) {
@@ -146,9 +147,11 @@ export default function MealsPage() {
     }
   }
 
-  const filteredMeals = meals.filter(meal => 
-    meal.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredMeals = meals.filter(meal => {
+    const matchesSearch = meal.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory = !selectedCategory || meal.category === selectedCategory
+    return matchesSearch && matchesCategory
+  })
 
   return (
     <div className="space-y-6">
@@ -177,14 +180,26 @@ export default function MealsPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <h2 className="text-xl font-semibold">Your Meals</h2>
-            <div className="w-full sm:w-72">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
               <Input
                 type="search"
                 placeholder="Search meals..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
+                className="w-full bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20 sm:w-64"
               />
+              <select
+                value={selectedCategory}
+                onChange={(event) => setSelectedCategory(event.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:w-48"
+              >
+                <option value="">All categories</option>
+                {Object.values(MEAL_CATEGORIES).map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </CardHeader>
