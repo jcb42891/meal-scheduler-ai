@@ -104,7 +104,7 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
           <DialogTitle>Add Meal to {date.toLocaleDateString()}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto pr-2">
+        <div className="flex-1 overflow-y-auto pr-2 pt-1">
           <form id="add-meal-form" onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-center">
               <Input
