@@ -208,8 +208,14 @@ export default function MealsPage() {
             <p className="text-muted-foreground">Loading meals...</p>
           ) : filteredMeals.length === 0 && selectedGroupId ? (
             <p className="text-muted-foreground">
-              {searchTerm ? (
+              {searchTerm && selectedCategory ? (
+                <>
+                  No meals found matching &quot;{searchTerm}&quot; in {selectedCategory}
+                </>
+              ) : searchTerm ? (
                 <>No meals found matching &quot;{searchTerm}&quot;</>
+              ) : selectedCategory ? (
+                <>No meals found in {selectedCategory}</>
               ) : (
                 'No meals have been created for this group yet.'
               )}
