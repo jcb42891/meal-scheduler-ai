@@ -485,6 +485,9 @@ export default function CalendarPage() {
                 const isOutsideMonth = !isSameMonth(day, currentDate)
                 const isToday = isSameDay(day, new Date())
                 const isSingleSelection = !!dateRange.start && (!dateRange.end || (dateRange.end && isSameDay(dateRange.start, dateRange.end)))
+                const isRangeStartDay = isRangeStart(day)
+                const isRangeEndDay = isRangeEnd(day)
+                const isInRange = isDateInRange(day)
                 const mealsForDay = meal ? [meal] : []
 
                 return (
@@ -505,10 +508,10 @@ export default function CalendarPage() {
                       "group min-h-[92px] sm:min-h-[108px] border-b border-r border-border/60 p-2.5 bg-card relative cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       isOutsideMonth && "text-muted-foreground/60",
                       meal && "bg-surface-2/50",
-                      isDateInRange(day) && "bg-primary/5",
-                      isSingleSelection && dateRange.start && isSameDay(day, dateRange.start) && "ring-2 ring-primary/40",
-                      dateRange.end && isRangeStart(day) && "ring-2 ring-primary/40",
-                      dateRange.end && isRangeEnd(day) && "ring-2 ring-primary/40",
+                      isInRange && "bg-primary/15 ring-1 ring-inset ring-primary/30",
+                      isSingleSelection && dateRange.start && isSameDay(day, dateRange.start) && "bg-primary/20 ring-2 ring-inset ring-primary/70",
+                      dateRange.end && isRangeStartDay && "bg-primary/20 ring-2 ring-inset ring-primary/70",
+                      dateRange.end && isRangeEndDay && "bg-primary/20 ring-2 ring-inset ring-primary/70",
                       !meal && "hover:bg-surface-2/60",
                       meal && "hover:bg-surface-2/70"
                     )}
@@ -603,6 +606,10 @@ export default function CalendarPage() {
               {mobileDays.map((day) => {
                 const dateStr = format(day, "yyyy-MM-dd")
                 const meal = calendarMeals[dateStr]
+                const isRangeStartDay = isRangeStart(day)
+                const isRangeEndDay = isRangeEnd(day)
+                const isInRange = isDateInRange(day)
+                const isSingleSelection = !!dateRange.start && (!dateRange.end || (dateRange.end && isSameDay(dateRange.start, dateRange.end)))
 
                 return (
                   <div
@@ -622,7 +629,10 @@ export default function CalendarPage() {
                       "p-3 bg-card rounded-xl border border-border/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                       "hover:bg-surface-2/60",
                       meal && "bg-surface-2/50",
-                      isDateInRange(day) && "ring-2 ring-primary/40 z-10"
+                      isInRange && "bg-primary/15 ring-1 ring-inset ring-primary/30",
+                      isSingleSelection && dateRange.start && isSameDay(day, dateRange.start) && "bg-primary/20 ring-2 ring-inset ring-primary/70",
+                      dateRange.end && isRangeStartDay && "bg-primary/20 ring-2 ring-inset ring-primary/70",
+                      dateRange.end && isRangeEndDay && "bg-primary/20 ring-2 ring-inset ring-primary/70"
                     )}
                   >
                     <div className="flex justify-between items-start gap-2">
