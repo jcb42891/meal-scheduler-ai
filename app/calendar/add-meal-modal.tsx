@@ -5,17 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { Input } from '@/components/ui/input'
-import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor } from '@/app/meals/meal-utils'
+import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from '@/app/meals/meal-utils'
 import { Chip } from '@/components/ui/chip'
 import { cn } from '@/lib/utils'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
+import { MealFilterRack, WeeknightFilterOption } from '@/components/meal-filter-rack'
 
 type Meal = {
   id: string
@@ -106,37 +99,21 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
 
         <div className="flex-1 overflow-y-auto pr-2 pt-1">
           <form id="add-meal-form" onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-center">
-              <Input
-                type="search"
-                placeholder="Search meals..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {Object.values(MEAL_CATEGORIES).map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={weeknightFilter} onValueChange={(value) => setWeeknightFilter(value as 'all' | 'friendly' | 'not-friendly')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Weeknight filter" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All meals</SelectItem>
-                  <SelectItem value="friendly">{WEEKNIGHT_FRIENDLY_LABEL}</SelectItem>
-                  <SelectItem value="not-friendly">Not weeknight friendly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <MealFilterRack
+              searchTerm={searchTerm}
+              onSearchTermChange={setSearchTerm}
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+              weeknightFilter={weeknightFilter}
+              onWeeknightFilterChange={setWeeknightFilter}
+              categoryOptions={Object.values(MEAL_CATEGORIES)}
+              weeknightOptions={[
+                { value: 'all', label: 'All meals' },
+                { value: 'friendly', label: WEEKNIGHT_FRIENDLY_LABEL, activeClassName: getWeeknightFriendlyColor() },
+                { value: 'not-friendly', label: 'Not weeknight friendly', activeClassName: getWeeknightNotFriendlyColor() },
+              ] satisfies WeeknightFilterOption[]}
+              className="bg-surface-2/40 p-3 shadow-none"
+            />
 
             <div className="grid gap-4">
               {filteredMeals.map((meal) => (

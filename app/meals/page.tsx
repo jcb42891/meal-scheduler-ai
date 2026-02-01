@@ -20,11 +20,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Trash2, Pencil, Search } from 'lucide-react'
+import { Trash2, Pencil } from 'lucide-react'
 import { EditMealDialog } from './edit-meal-dialog'
 import { cn } from '@/lib/utils'
 import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from './meal-utils'
-import { Input } from '@/components/ui/input'
+import { MealFilterRack, WeeknightFilterOption } from '@/components/meal-filter-rack'
 
 type Group = {
   id: string
@@ -52,7 +52,7 @@ export default function MealsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [mealToEdit, setMealToEdit] = useState<Meal | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const [weeknightFilter, setWeeknightFilter] = useState<'all' | 'friendly' | 'not-friendly'>('all')
 
   useEffect(() => {
@@ -153,7 +153,7 @@ export default function MealsPage() {
 
   const filteredMeals = meals.filter(meal => {
     const matchesSearch = meal.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = !selectedCategory || meal.category === selectedCategory
+    const matchesCategory = selectedCategory === 'all' || meal.category === selectedCategory
     const matchesWeeknight = weeknightFilter === 'all'
       || (weeknightFilter === 'friendly' && meal.weeknight_friendly)
       || (weeknightFilter === 'not-friendly' && !meal.weeknight_friendly)
@@ -187,55 +187,24 @@ export default function MealsPage() {
       </div>
 
       <Card>
-        <CardHeader className="pb-4">
+        <CardHeader className="space-y-4 pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold">Your Meals</h2>
-            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search meals..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9"
-                />
-              </div>
-              <select
-                value={selectedCategory}
-                onChange={(event) => setSelectedCategory(event.target.value)}
-                className="h-10 w-full rounded-[10px] border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background sm:w-48"
-              >
-                <option value="">All categories</option>
-                {Object.values(MEAL_CATEGORIES).map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: 'all', label: 'All meals', className: 'bg-surface-2 text-muted-foreground hover:bg-surface-2/80' },
-                  { value: 'friendly', label: WEEKNIGHT_FRIENDLY_LABEL, className: getWeeknightFriendlyColor() },
-                  { value: 'not-friendly', label: 'Not weeknight friendly', className: getWeeknightNotFriendlyColor() },
-                ].map((filter) => (
-                  <button
-                    key={filter.value}
-                    type="button"
-                    onClick={() => setWeeknightFilter(filter.value as 'all' | 'friendly' | 'not-friendly')}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-                      weeknightFilter === filter.value
-                        ? filter.className
-                        : 'bg-surface-2 text-muted-foreground hover:bg-surface-2/80'
-                    )}
-                  >
-                    {filter.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
+          <MealFilterRack
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            weeknightFilter={weeknightFilter}
+            onWeeknightFilterChange={setWeeknightFilter}
+            categoryOptions={Object.values(MEAL_CATEGORIES)}
+            weeknightOptions={[
+              { value: 'all', label: 'All meals' },
+              { value: 'friendly', label: WEEKNIGHT_FRIENDLY_LABEL, activeClassName: getWeeknightFriendlyColor() },
+              { value: 'not-friendly', label: 'Not weeknight friendly', activeClassName: getWeeknightNotFriendlyColor() },
+            ] satisfies WeeknightFilterOption[]}
+          />
         </CardHeader>
         <CardContent className="space-y-3">
           {loading ? (
@@ -258,19 +227,19 @@ export default function MealsPage() {
           ) : filteredMeals.length === 0 && selectedGroupId ? (
             <div className="rounded-xl border border-border/60 bg-surface-2/70 p-6 text-center shadow-sm">
               <p className="text-sm text-muted-foreground">
-                {searchTerm && selectedCategory ? (
+                {searchTerm && selectedCategory !== 'all' ? (
                   <>
                     No meals found matching &quot;{searchTerm}&quot; in {selectedCategory}.
                   </>
                 ) : searchTerm ? (
                   <>No meals found matching &quot;{searchTerm}&quot;.</>
-                ) : selectedCategory ? (
+                ) : selectedCategory !== 'all' ? (
                   <>No meals found in {selectedCategory}.</>
                 ) : (
                   'No meals have been created for this group yet.'
                 )}
               </p>
-              {!searchTerm && !selectedCategory && (
+              {!searchTerm && selectedCategory === 'all' && (
                 <Button
                   onClick={() => setShowCreateDialog(true)}
                   className="mt-4"
