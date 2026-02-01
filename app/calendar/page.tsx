@@ -24,7 +24,6 @@ import {
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import { AddMealModal } from "./add-meal-modal"
-import { GroceryListModal } from "./grocery-list-modal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from "@/app/meals/meal-utils"
 import { cn } from "@/lib/utils"
@@ -48,7 +47,6 @@ export default function CalendarPage() {
     start: Date | null
     end: Date | null
   }>({ start: null, end: null })
-  const [showGroceryList, setShowGroceryList] = useState(false)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [isMonthLoading, setIsMonthLoading] = useState(false)
   const [mobileWeekStart, setMobileWeekStart] = useState(startOfWeek(new Date()))
@@ -335,7 +333,6 @@ export default function CalendarPage() {
 
       // Reset selection and close grocery list
       setDateRange({ start: null, end: null })
-      setShowGroceryList(false)
     }
 
     document.addEventListener('click', handleDocumentClick)
@@ -351,7 +348,6 @@ export default function CalendarPage() {
     if (!dateRange.start) {
       // First click - set start date
       setDateRange({ start: date, end: null })
-      setShowGroceryList(false)
     } else if (!dateRange.end) {
       // Second click - set end date and ensure correct order
       const start = dateRange.start
@@ -362,14 +358,35 @@ export default function CalendarPage() {
     } else {
       // Reset and start new selection
       setDateRange({ start: date, end: null })
-      setShowGroceryList(false)
     }
   }
 
   const handleGenerateList = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setShowGroceryList(true)
+    if (!selectedGroupId || !dateRange.start) {
+      toast.error("Select a date range first")
+      return
+    }
+
+    const start = dateRange.start
+    const end = dateRange.end || dateRange.start
+    const params = new URLSearchParams({
+      groupId: selectedGroupId,
+      start: format(start, "yyyy-MM-dd"),
+      end: format(end, "yyyy-MM-dd")
+    })
+
+    const url = `/grocery-list?${params.toString()}`
+    const nextWindow = window.open(url, "_blank", "noopener,noreferrer")
+    if (!nextWindow) {
+      toast.error("Pop-up blocked. Please allow pop-ups for this site.")
+      return
+    }
+    try {
+      nextWindow.focus()
+    } catch {
+    }
   }
 
   const isRangeStart = (date: Date) => {
@@ -749,15 +766,6 @@ export default function CalendarPage() {
         />
       )}
 
-      {dateRange.start && (
-        <GroceryListModal
-          open={showGroceryList}
-          onOpenChange={setShowGroceryList}
-          groupId={selectedGroupId}
-          startDate={dateRange.start}
-          endDate={dateRange.end || dateRange.start}
-        />
-      )}
     </div>
   )
 }
