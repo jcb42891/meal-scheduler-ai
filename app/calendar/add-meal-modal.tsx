@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
-import { MEAL_CATEGORIES } from '@/app/meals/meal-utils'
+import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from '@/app/meals/meal-utils'
+import { Chip } from '@/components/ui/chip'
+import { cn } from '@/lib/utils'
 import {
   Select,
   SelectContent,
@@ -105,10 +107,9 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
                 placeholder="Search meals..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
               />
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20">
+                <SelectTrigger>
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -126,17 +127,17 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
               {filteredMeals.map((meal) => (
                 <div
                   key={meal.id}
-                  className={`p-3 rounded-lg border cursor-pointer hover:bg-[#98C1B2]/5 ${
-                    selectedMealId === meal.id ? 'border-[#98C1B2] bg-[#98C1B2]/10' : 'border-[#98C1B2]/30'
+                  className={`rounded-[10px] border border-border/60 bg-card p-3 cursor-pointer transition-colors hover:bg-surface-2/60 ${
+                    selectedMealId === meal.id ? 'border-primary/50 bg-primary/5' : ''
                   }`}
                   onClick={() => setSelectedMealId(meal.id)}
                 >
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium">{meal.name}</h3>
                     {meal.category && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-[#98C1B2]/10 text-[#2F4F4F]">
+                      <Chip className={cn("text-xs", getCategoryColor(meal.category as MealCategory))}>
                         {meal.category}
-                      </span>
+                      </Chip>
                     )}
                   </div>
                 </div>

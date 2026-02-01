@@ -25,10 +25,10 @@ export function Navbar() {
   ]
 
   return (
-    <nav className="border-b bg-white">
+    <nav className="border-b border-border/60 bg-card/90 backdrop-blur">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="text-xl font-semibold text-[#2F4F4F]">
+          <Link href="/" className="text-xl font-semibold text-foreground">
             Pantry Planner
           </Link>
 
@@ -39,9 +39,9 @@ export function Navbar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'text-sm font-medium transition-colors hover:text-[#2F4F4F]',
+                  'text-sm font-medium transition-colors hover:text-foreground',
                   pathname === item.href
-                    ? 'text-[#2F4F4F]'
+                    ? 'text-foreground'
                     : 'text-muted-foreground'
                 )}
               >

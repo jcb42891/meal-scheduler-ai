@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
@@ -182,14 +183,13 @@ export default function GroupsPage() {
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <h2 className="text-xl font-semibold">{group.name}</h2>
                 {group.owner_id === user?.id && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  <IconButton
+                    aria-label={`Delete ${group.name}`}
+                    variant="destructive"
                     onClick={() => setGroupToDelete(group)}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </Button>
+                  </IconButton>
                 )}
               </CardHeader>
               <CardContent>
@@ -220,7 +220,7 @@ export default function GroupsPage() {
           </DialogHeader>
           <form onSubmit={handleCreateGroup} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-500">
+              <label className="text-sm font-medium text-muted-foreground">
                 Group Name
               </label>
               <Input

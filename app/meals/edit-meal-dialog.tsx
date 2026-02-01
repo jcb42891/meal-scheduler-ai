@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -10,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
+import { X } from 'lucide-react'
 
 type Meal = {
   id: string
@@ -247,7 +249,6 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
               />
             </div>
             
@@ -260,10 +261,10 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                     type="button"
                     onClick={() => setCategory(cat)}
                     className={cn(
-                      'px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap',
+                      'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                       category === cat 
                         ? getCategoryColor(cat as MealCategory)
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        : 'bg-surface-2 text-muted-foreground hover:bg-surface-2/80'
                     )}
                   >
                     {cat}
@@ -279,7 +280,6 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
               />
             </div>
 
@@ -291,7 +291,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                     placeholder="Search or add new ingredient"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
+                    className="w-full"
                   />
                 </div>
                 <Button type="button" onClick={handleAddIngredient} className="w-full sm:w-auto">
@@ -301,7 +301,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
 
               <div className="space-y-2">
                 {selectedIngredients?.map((item, index) => (
-                  <div key={item?.ingredient?.id || index} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-2 border rounded">
+                  <div key={item?.ingredient?.id || index} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 rounded-[10px] border border-border/60 bg-card p-2">
                     <span className="font-medium flex-1">{item?.ingredient?.name}</span>
                     <div className="flex flex-wrap sm:flex-nowrap items-end gap-2 w-full sm:w-auto">
                       <div className="w-20">
@@ -317,7 +317,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                             newIngredients[index].quantity = e.target.value === '' ? 0 : parseFloat(e.target.value)
                             setSelectedIngredients(newIngredients)
                           }}
-                          className="w-full bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
+                          className="w-full"
                           min="0"
                           step="0.1"
                         />
@@ -334,7 +334,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                             newIngredients[index].unit = e.target.value
                             setSelectedIngredients(newIngredients)
                           }}
-                          className="h-10 w-full rounded-md border border-[#98C1B2]/30 bg-white/50 px-3 text-sm focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
+                          className="h-10 w-full rounded-[10px] border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
                         >
                           <option value="unit">unit</option>
                           <option value="oz">oz</option>
@@ -347,19 +347,17 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                           <option value="cup">cups</option>
                         </select>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
+                      <IconButton
+                        aria-label={`Remove ${item?.ingredient?.name}`}
+                        variant="destructive"
                         onClick={() => {
                           setSelectedIngredients(
                             selectedIngredients.filter((_, i) => i !== index)
                           )
                         }}
-                        className="text-destructive hover:text-destructive/90"
                       >
-                        x
-                      </Button>
+                        <X className="h-4 w-4" />
+                      </IconButton>
                     </div>
                   </div>
                 ))}
