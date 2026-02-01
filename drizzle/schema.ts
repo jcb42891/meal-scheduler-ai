@@ -132,6 +132,35 @@ export const meals = pgTable("meals", {
 	pgPolicy("Users can view meals in their groups", { as: "permissive", for: "select", to: ["public"] }),
 ]);
 
+export const staple_ingredients = pgTable("staple_ingredients", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	name: text().notNull(),
+	category: text(),
+	quantity: numeric().notNull(),
+	unit: text().notNull(),
+	group_id: uuid().notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
+	created_by: uuid(),
+}, (table) => [
+	unique("staple_ingredients_group_id_name_key").on(table.group_id, table.name),
+	foreignKey({
+			columns: [table.created_by],
+			foreignColumns: [usersInAuth.id],
+			name: "staple_ingredients_created_by_fkey"
+		}),
+	foreignKey({
+			columns: [table.group_id],
+			foreignColumns: [groups.id],
+			name: "staple_ingredients_group_id_fkey"
+		}).onDelete("cascade"),
+	pgPolicy("Users can create staple ingredients in their groups", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(EXISTS ( SELECT 1
+   FROM group_members
+  WHERE ((group_members.group_id = staple_ingredients.group_id) AND (group_members.user_id = auth.uid()))))`  }),
+	pgPolicy("Users can delete staple ingredients in their groups", { as: "permissive", for: "delete", to: ["public"] }),
+	pgPolicy("Users can update staple ingredients in their groups", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("Users can view staple ingredients in their groups", { as: "permissive", for: "select", to: ["public"] }),
+]);
+
 export const group_members = pgTable("group_members", {
 	group_id: uuid().notNull(),
 	user_id: uuid().notNull(),
