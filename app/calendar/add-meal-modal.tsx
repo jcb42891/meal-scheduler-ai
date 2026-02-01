@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
-import { MEAL_CATEGORIES } from '@/app/meals/meal-utils'
+import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from '@/app/meals/meal-utils'
 import { Chip } from '@/components/ui/chip'
+import { cn } from '@/lib/utils'
 import {
   Select,
   SelectContent,
@@ -134,7 +135,7 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium">{meal.name}</h3>
                     {meal.category && (
-                      <Chip className="bg-surface-2 text-muted-foreground">
+                      <Chip className={cn("text-xs", getCategoryColor(meal.category as MealCategory))}>
                         {meal.category}
                       </Chip>
                     )}
