@@ -23,7 +23,7 @@ import {
 import { Trash2, Pencil, Search } from 'lucide-react'
 import { EditMealDialog } from './edit-meal-dialog'
 import { cn } from '@/lib/utils'
-import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
+import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from './meal-utils'
 import { Input } from '@/components/ui/input'
 
 type Group = {
@@ -36,6 +36,7 @@ type Meal = {
   name: string
   description: string
   category: string
+  weeknight_friendly: boolean
   group_id: string
 }
 
@@ -52,6 +53,7 @@ export default function MealsPage() {
   const [mealToEdit, setMealToEdit] = useState<Meal | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [weeknightFilter, setWeeknightFilter] = useState<'all' | 'friendly' | 'not-friendly'>('all')
 
   useEffect(() => {
     if (!user) {
@@ -152,7 +154,10 @@ export default function MealsPage() {
   const filteredMeals = meals.filter(meal => {
     const matchesSearch = meal.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = !selectedCategory || meal.category === selectedCategory
-    return matchesSearch && matchesCategory
+    const matchesWeeknight = weeknightFilter === 'all'
+      || (weeknightFilter === 'friendly' && meal.weeknight_friendly)
+      || (weeknightFilter === 'not-friendly' && !meal.weeknight_friendly)
+    return matchesSearch && matchesCategory && matchesWeeknight
   })
 
   return (
@@ -208,6 +213,27 @@ export default function MealsPage() {
                   </option>
                 ))}
               </select>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'all', label: 'All meals', className: 'bg-surface-2 text-muted-foreground hover:bg-surface-2/80' },
+                  { value: 'friendly', label: WEEKNIGHT_FRIENDLY_LABEL, className: getWeeknightFriendlyColor() },
+                  { value: 'not-friendly', label: 'Not weeknight friendly', className: getWeeknightNotFriendlyColor() },
+                ].map((filter) => (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => setWeeknightFilter(filter.value as 'all' | 'friendly' | 'not-friendly')}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                      weeknightFilter === filter.value
+                        ? filter.className
+                        : 'bg-surface-2 text-muted-foreground hover:bg-surface-2/80'
+                    )}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -273,13 +299,18 @@ export default function MealsPage() {
                         </p>
                       )}
                     </div>
-                    <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
-                      {meal.category && (
-                        <Chip className={cn("text-xs", getCategoryColor(meal.category as MealCategory))}>
-                          {meal.category}
-                        </Chip>
-                      )}
-                      <div className="flex items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                  <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
+                    {meal.category && (
+                      <Chip className={cn("text-xs", getCategoryColor(meal.category as MealCategory))}>
+                        {meal.category}
+                      </Chip>
+                    )}
+                    {meal.weeknight_friendly && (
+                      <Chip className={cn("text-xs", getWeeknightFriendlyColor())}>
+                        {WEEKNIGHT_FRIENDLY_LABEL}
+                      </Chip>
+                    )}
+                    <div className="flex items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                         <IconButton
                           aria-label={`Edit ${meal.name}`}
                           onClick={() => setMealToEdit(meal)}

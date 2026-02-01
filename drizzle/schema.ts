@@ -1,4 +1,4 @@
-import { pgTable, pgSchema, foreignKey, pgPolicy, uuid, text, timestamp, unique, date, primaryKey, numeric } from "drizzle-orm/pg-core"
+import { pgTable, pgSchema, foreignKey, pgPolicy, uuid, text, timestamp, unique, date, primaryKey, numeric, boolean } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 const auth = pgSchema("auth");
@@ -109,6 +109,7 @@ export const meals = pgTable("meals", {
 	name: text().notNull(),
 	description: text(),
 	category: text(),
+	weeknight_friendly: boolean().default(false).notNull(),
 	group_id: uuid(),
 	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	created_by: uuid(),

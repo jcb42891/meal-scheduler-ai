@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { cn } from '@/lib/utils'
-import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
+import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from './meal-utils'
 import { X } from 'lucide-react'
 
 type Props = {
@@ -37,6 +37,7 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
+  const [weeknightFriendly, setWeeknightFriendly] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [selectedIngredients, setSelectedIngredients] = useState<MealIngredient[]>([])
@@ -55,6 +56,7 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
           name,
           description,
           category,
+          weeknight_friendly: weeknightFriendly,
           group_id: groupId,
           created_by: user.id
         })
@@ -86,6 +88,7 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
       setName('')
       setDescription('')
       setCategory('')
+      setWeeknightFriendly(false)
       setSelectedIngredients([])
     } catch (error) {
       console.error('Error creating meal:', error)
@@ -147,6 +150,36 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
                     {cat}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Weeknight friendly</Label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWeeknightFriendly(true)}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                    weeknightFriendly
+                      ? getWeeknightFriendlyColor()
+                      : 'bg-surface-2 text-muted-foreground hover:bg-surface-2/80'
+                  )}
+                >
+                  {WEEKNIGHT_FRIENDLY_LABEL}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWeeknightFriendly(false)}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                    !weeknightFriendly
+                      ? getWeeknightNotFriendlyColor()
+                      : 'bg-surface-2 text-muted-foreground hover:bg-surface-2/80'
+                  )}
+                >
+                  Not weeknight friendly
+                </button>
               </div>
             </div>
 

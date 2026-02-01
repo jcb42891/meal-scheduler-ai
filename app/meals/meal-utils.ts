@@ -8,6 +8,11 @@ export const MEAL_CATEGORIES = {
 
 export type MealCategory = typeof MEAL_CATEGORIES[keyof typeof MEAL_CATEGORIES]
 
+export const WEEKNIGHT_FRIENDLY_LABEL = 'Weeknight friendly'
+
+export const getWeeknightFriendlyColor = () => 'bg-emerald-100 text-emerald-800'
+export const getWeeknightNotFriendlyColor = () => 'bg-slate-100 text-slate-700'
+
 export const getCategoryColor = (category: MealCategory) => {
   switch (category) {
     case MEAL_CATEGORIES.POULTRY:
