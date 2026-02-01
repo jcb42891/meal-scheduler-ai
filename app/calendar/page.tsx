@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Chip } from "@/components/ui/chip"
-import { ChevronLeft, ChevronRight, Dice5, Plus, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Dice5, Moon, MoonStar, Plus, Trash2 } from "lucide-react"
 import {
   format,
   addMonths,
@@ -26,7 +26,7 @@ import { toast } from "sonner"
 import { AddMealModal } from "./add-meal-modal"
 import { GroceryListModal } from "./grocery-list-modal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { MealCategory, getCategoryColor } from "@/app/meals/meal-utils"
+import { MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from "@/app/meals/meal-utils"
 import { cn } from "@/lib/utils"
 
 type GroupMember = {
@@ -43,7 +43,7 @@ export default function CalendarPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>("")
   const [showAddMeal, setShowAddMeal] = useState(false)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [calendarMeals, setCalendarMeals] = useState<Record<string, { id: string; name: string; category: string }>>({})
+  const [calendarMeals, setCalendarMeals] = useState<Record<string, { id: string; name: string; category: string; weeknight_friendly: boolean }>>({})
   const [dateRange, setDateRange] = useState<{
     start: Date | null
     end: Date | null
@@ -134,7 +134,7 @@ export default function CalendarPage() {
           
           const { data, error } = await supabase
             .from('meal_calendar')
-            .select('date, meal:meals(id, name, category)')
+            .select('date, meal:meals(id, name, category, weeknight_friendly)')
             .eq('group_id', selectedGroupId)
             .gte('date', start.toISOString().split('T')[0])
             .lte('date', end.toISOString().split('T')[0])
@@ -221,7 +221,7 @@ export default function CalendarPage() {
 
     const { data, error } = await supabase
       .from('meal_calendar')
-      .select('date, meal:meals(id, name, category)')
+      .select('date, meal:meals(id, name, category, weeknight_friendly)')
       .eq('group_id', selectedGroupId)
       .gte('date', start.toISOString().split('T')[0])
       .lte('date', end.toISOString().split('T')[0])
@@ -489,6 +489,23 @@ export default function CalendarPage() {
                 const isRangeEndDay = isRangeEnd(day)
                 const isInRange = isDateInRange(day)
                 const mealsForDay = meal ? [meal] : []
+                const weeknightIndicator = meal ? (
+                  <span
+                    className={cn(
+                      "inline-flex h-5 w-5 items-center justify-center rounded-full",
+                      meal.weeknight_friendly ? getWeeknightFriendlyColor() : getWeeknightNotFriendlyColor(),
+                      isOutsideMonth && "opacity-70"
+                    )}
+                    title={meal.weeknight_friendly ? WEEKNIGHT_FRIENDLY_LABEL : "Not weeknight friendly"}
+                    aria-label={meal.weeknight_friendly ? WEEKNIGHT_FRIENDLY_LABEL : "Not weeknight friendly"}
+                  >
+                    {meal.weeknight_friendly ? (
+                      <MoonStar className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <Moon className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                  </span>
+                ) : null
 
                 return (
                   <div
@@ -526,6 +543,7 @@ export default function CalendarPage() {
                       >
                         {format(day, "d")}
                       </span>
+                      {weeknightIndicator}
                       {selectedGroupId && (
                         <div className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition flex items-center gap-2">
                           {meal ? (
@@ -610,6 +628,22 @@ export default function CalendarPage() {
                 const isRangeEndDay = isRangeEnd(day)
                 const isInRange = isDateInRange(day)
                 const isSingleSelection = !!dateRange.start && (!dateRange.end || (dateRange.end && isSameDay(dateRange.start, dateRange.end)))
+                const weeknightIndicator = meal ? (
+                  <span
+                    className={cn(
+                      "inline-flex h-5 w-5 items-center justify-center rounded-full",
+                      meal.weeknight_friendly ? getWeeknightFriendlyColor() : getWeeknightNotFriendlyColor()
+                    )}
+                    title={meal.weeknight_friendly ? WEEKNIGHT_FRIENDLY_LABEL : "Not weeknight friendly"}
+                    aria-label={meal.weeknight_friendly ? WEEKNIGHT_FRIENDLY_LABEL : "Not weeknight friendly"}
+                  >
+                    {meal.weeknight_friendly ? (
+                      <MoonStar className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <Moon className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                  </span>
+                ) : null
 
                 return (
                   <div
@@ -643,6 +677,7 @@ export default function CalendarPage() {
                         <span className="text-xs text-muted-foreground">
                           {format(day, "MMM d")}
                         </span>
+                        {weeknightIndicator}
                       </div>
                       {selectedGroupId && (
                         <div className="flex items-center gap-2">
