@@ -20,6 +20,7 @@ export function Navbar() {
   const navItems = [
     { href: '/calendar', label: 'Calendar' },
     { href: '/meals', label: 'Meal Library' },
+    { href: '/staples', label: 'Staple Ingredients' },
     { href: '/groups', label: 'Groups' },
     { href: '/profile', label: 'Profile' },
   ]
