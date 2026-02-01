@@ -112,7 +112,7 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
                 { value: 'friendly', label: WEEKNIGHT_FRIENDLY_LABEL, activeClassName: getWeeknightFriendlyColor() },
                 { value: 'not-friendly', label: 'Not weeknight friendly', activeClassName: getWeeknightNotFriendlyColor() },
               ] satisfies WeeknightFilterOption[]}
-              className="bg-transparent p-0 shadow-none"
+              className="bg-surface-2/40 p-3 shadow-none"
             />
 
             <div className="grid gap-4">
