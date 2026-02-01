@@ -1,0 +1,59 @@
+name: db-migrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target database"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+      confirm:
+        description: "Type CONFIRM to run migrations"
+        required: true
+        default: ""
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require confirmation
+        run: |
+          if [ "${{ inputs.confirm }}" != "CONFIRM" ]; then
+            echo "confirm input must be CONFIRM to run migrations" >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set database URL
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            if [ -z "${{ secrets.PROD_DATABASE_URL }}" ]; then
+              echo "PROD_DATABASE_URL secret is required for production migrations" >&2
+              exit 1
+            fi
+            echo "DATABASE_URL=${{ secrets.PROD_DATABASE_URL }}" >> "$GITHUB_ENV"
+          else
+            if [ -z "${{ secrets.STAGING_DATABASE_URL }}" ]; then
+              echo "STAGING_DATABASE_URL secret is required for staging migrations" >&2
+              exit 1
+            fi
+            echo "DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run migrations
+        run: npm run db:migrate

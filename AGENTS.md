@@ -30,6 +30,27 @@ Supabase touchpoints
 - Edge function: `supabase/functions/send-group-invite/index.ts`.
 - Middleware redirects based on session: `middleware.ts`.
 
+DB migrations (Drizzle + remote Supabase)
+- Migrations live in `drizzle/*.sql` and are tracked by `drizzle/meta/_journal.json`.
+- Add a new migration:
+  1) Create a new SQL file in `drizzle/` (next sequential tag, e.g. `0002_*.sql`).
+  2) Add a matching entry in `drizzle/meta/_journal.json` with `idx` incremented and a `when` value greater than the previous entry.
+  3) Run `npm run db:migrate` with `DATABASE_URL` set to the remote Supabase Postgres connection string.
+- Important: `0000_*` is an introspection baseline and must NOT be executed against the remote DB.
+  - If migrations fail trying to run `0000_*`, mark it as applied in the remote DB by inserting into `drizzle.__drizzle_migrations`,
+    then rerun `npm run db:migrate`.
+- Verification: confirm schema changes with a query like:
+  - `select column_name from information_schema.columns where table_schema='public' and table_name='meals';`
+- GitHub Actions migration workflow:
+  - Workflow: `.github/workflows/db-migrate.yml` (manual trigger only).
+  - Why: keep schema changes automated but decoupled from Vercel deploys to avoid build-time failures/races.
+  - How to use:
+    1) Run the workflow via GitHub Actions → `db-migrate`.
+    2) Pick `staging` or `production` and type `CONFIRM`.
+  - It uses `npm run db:migrate` and expects secrets:
+    - `STAGING_DATABASE_URL`
+    - `PROD_DATABASE_URL`
+
 UI + styling
 - Tailwind config: `tailwind.config.ts`.
 - Shared UI components: `components/ui/*`.
