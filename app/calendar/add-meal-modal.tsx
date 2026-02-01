@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
-import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from '@/app/meals/meal-utils'
+import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor } from '@/app/meals/meal-utils'
 import { Chip } from '@/components/ui/chip'
 import { cn } from '@/lib/utils'
 import {
@@ -21,6 +21,7 @@ type Meal = {
   id: string
   name: string
   category: string
+  weeknight_friendly: boolean
 }
 
 type Props = {
@@ -37,6 +38,7 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [weeknightFilter, setWeeknightFilter] = useState<'all' | 'friendly' | 'not-friendly'>('all')
 
   useEffect(() => {
     if (!open || !groupId) return
@@ -44,7 +46,7 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
     const fetchMeals = async () => {
       const { data, error } = await supabase
         .from('meals')
-        .select('id, name, category')
+        .select('id, name, category, weeknight_friendly')
         .eq('group_id', groupId)
         .order('name')
 
@@ -89,7 +91,10 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
   const filteredMeals = meals.filter(meal => {
     const matchesName = meal.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedCategory === 'all' || meal.category === selectedCategory
-    return matchesName && matchesCategory
+    const matchesWeeknight = weeknightFilter === 'all'
+      || (weeknightFilter === 'friendly' && meal.weeknight_friendly)
+      || (weeknightFilter === 'not-friendly' && !meal.weeknight_friendly)
+    return matchesName && matchesCategory && matchesWeeknight
   })
 
   return (
@@ -101,7 +106,7 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
 
         <div className="flex-1 overflow-y-auto pr-2">
           <form id="add-meal-form" onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] sm:items-center">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-center">
               <Input
                 type="search"
                 placeholder="Search meals..."
@@ -119,6 +124,16 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
                       {category}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              <Select value={weeknightFilter} onValueChange={(value) => setWeeknightFilter(value as 'all' | 'friendly' | 'not-friendly')}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Weeknight filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All meals</SelectItem>
+                  <SelectItem value="friendly">{WEEKNIGHT_FRIENDLY_LABEL}</SelectItem>
+                  <SelectItem value="not-friendly">Not weeknight friendly</SelectItem>
                 </SelectContent>
               </Select>
             </div>
