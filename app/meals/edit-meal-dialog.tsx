@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { MEAL_CATEGORIES, MealCategory, getCategoryColor } from './meal-utils'
+import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from './meal-utils'
 import { X } from 'lucide-react'
 
 type Meal = {
@@ -18,6 +18,7 @@ type Meal = {
   name: string
   description: string
   category: string
+  weeknight_friendly: boolean
   group_id: string
 }
 
@@ -44,6 +45,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
+  const [weeknightFriendly, setWeeknightFriendly] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [selectedIngredients, setSelectedIngredients] = useState<MealIngredient[]>([])
@@ -55,6 +57,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
       setName(meal.name)
       setDescription(meal.description || '')
       setCategory(meal.category || '')
+      setWeeknightFriendly(meal.weeknight_friendly ?? false)
       fetchMealIngredients()
     }
   }, [meal])
@@ -120,7 +123,8 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
         .update({
           name,
           description,
-          category
+          category,
+          weeknight_friendly: weeknightFriendly
         })
         .eq('id', meal.id)
         .select()
@@ -270,6 +274,36 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
                     {cat}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Weeknight friendly</Label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWeeknightFriendly(true)}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                    weeknightFriendly
+                      ? getWeeknightFriendlyColor()
+                      : 'bg-surface-2 text-muted-foreground hover:bg-surface-2/80'
+                  )}
+                >
+                  {WEEKNIGHT_FRIENDLY_LABEL}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWeeknightFriendly(false)}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                    !weeknightFriendly
+                      ? getWeeknightNotFriendlyColor()
+                      : 'bg-surface-2 text-muted-foreground hover:bg-surface-2/80'
+                  )}
+                >
+                  Not weeknight friendly
+                </button>
               </div>
             </div>
 
