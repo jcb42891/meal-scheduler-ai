@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "db:introspect": "drizzle-kit introspect",
+    "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
