@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, PlusCircle, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Dice5, PlusCircle, Trash2 } from "lucide-react"
 import {
   format,
   addMonths,
@@ -17,6 +17,7 @@ import {
   subWeeks,
   addWeeks,
   isSameDay,
+  subDays,
 } from "date-fns"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
@@ -49,6 +50,7 @@ export default function CalendarPage() {
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [isMonthLoading, setIsMonthLoading] = useState(false)
   const [mobileWeekStart, setMobileWeekStart] = useState(startOfWeek(new Date()))
+  const [randomizingDate, setRandomizingDate] = useState<string | null>(null)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -198,6 +200,44 @@ export default function CalendarPage() {
     setMobileWeekStart(prev => addWeeks(prev, 1))
   }
 
+  const getVisibleRange = () => {
+    if (window.innerWidth >= 640) {
+      return {
+        start: startOfMonth(currentDate),
+        end: endOfMonth(currentDate)
+      }
+    }
+
+    return {
+      start: mobileWeekStart,
+      end: endOfWeek(mobileWeekStart)
+    }
+  }
+
+  const refreshCalendarMeals = async () => {
+    const { start, end } = getVisibleRange()
+
+    const { data, error } = await supabase
+      .from('meal_calendar')
+      .select('date, meal:meals(id, name, category)')
+      .eq('group_id', selectedGroupId)
+      .gte('date', start.toISOString().split('T')[0])
+      .lte('date', end.toISOString().split('T')[0])
+
+    if (error) {
+      console.error('Error refreshing calendar:', error)
+      toast.error('Failed to load meals')
+      return
+    }
+
+    const meals = data.reduce((acc, item) => ({
+      ...acc,
+      [item.date]: item.meal
+    }), {})
+
+    setCalendarMeals(meals)
+  }
+
   const deleteMeal = async (dateStr: string) => {
     if (!selectedGroupId) return
 
@@ -210,33 +250,65 @@ export default function CalendarPage() {
 
       if (error) throw error
 
-      // Fetch updated meals for the current week/month
-      const start = window.innerWidth >= 640 
-        ? startOfMonth(currentDate)
-        : mobileWeekStart
-      const end = window.innerWidth >= 640
-        ? endOfMonth(currentDate)
-        : endOfWeek(mobileWeekStart)
-
-      const { data: updatedData, error: fetchError } = await supabase
-        .from('meal_calendar')
-        .select('date, meal:meals(id, name, category)')
-        .eq('group_id', selectedGroupId)
-        .gte('date', start.toISOString().split('T')[0])
-        .lte('date', end.toISOString().split('T')[0])
-
-      if (fetchError) throw fetchError
-
-      const meals = updatedData.reduce((acc, item) => ({
-        ...acc,
-        [item.date]: item.meal
-      }), {})
-
-      setCalendarMeals(meals)
+      await refreshCalendarMeals()
       toast.success("Meal removed")
     } catch (error) {
       console.error("Error removing meal:", error)
       toast.error("Failed to remove meal")
+    }
+  }
+
+  const handleRandomMeal = async (day: Date) => {
+    if (!selectedGroupId) return
+
+    const dateStr = format(day, "yyyy-MM-dd")
+    setRandomizingDate(dateStr)
+
+    try {
+      const { data: meals, error: mealsError } = await supabase
+        .from('meals')
+        .select('id, name, category')
+        .eq('group_id', selectedGroupId)
+
+      if (mealsError) throw mealsError
+      if (!meals || meals.length === 0) {
+        toast.error("No meals available to choose from")
+        return
+      }
+
+      const recentStart = format(subDays(day, 7), "yyyy-MM-dd")
+      const recentEnd = format(subDays(day, 1), "yyyy-MM-dd")
+      const { data: recentMeals, error: recentError } = await supabase
+        .from('meal_calendar')
+        .select('meal_id')
+        .eq('group_id', selectedGroupId)
+        .gte('date', recentStart)
+        .lte('date', recentEnd)
+
+      if (recentError) throw recentError
+
+      const recentMealIds = new Set((recentMeals || []).map((item) => item.meal_id))
+      const eligibleMeals = meals.filter((meal) => !recentMealIds.has(meal.id))
+      const mealPool = eligibleMeals.length > 0 ? eligibleMeals : meals
+      const randomMeal = mealPool[Math.floor(Math.random() * mealPool.length)]
+
+      const { error: insertError } = await supabase
+        .from('meal_calendar')
+        .insert({
+          meal_id: randomMeal.id,
+          group_id: selectedGroupId,
+          date: dateStr
+        })
+
+      if (insertError) throw insertError
+
+      toast.success(`Added ${randomMeal.name}`)
+      await refreshCalendarMeals()
+    } catch (error) {
+      console.error("Error adding random meal:", error)
+      toast.error("Failed to add random meal")
+    } finally {
+      setRandomizingDate(null)
     }
   }
 
@@ -429,25 +501,48 @@ export default function CalendarPage() {
                         {format(day, "d")}
                       </span>
                       {selectedGroupId && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "h-7 w-7",
-                            meal ? "text-red-500 hover:text-red-600" : ""
+                        <div className="flex items-center gap-1">
+                          {meal ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-500 hover:text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                deleteMeal(dateStr)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedDate(day)
+                                  setShowAddMeal(true)
+                                }}
+                              >
+                                <PlusCircle className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                disabled={randomizingDate === dateStr}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleRandomMeal(day)
+                                }}
+                              >
+                                <Dice5 className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (meal) {
-                              deleteMeal(dateStr)
-                            } else {
-                              setSelectedDate(day)
-                              setShowAddMeal(true)
-                            }
-                          }}
-                        >
-                          {meal ? <Trash2 className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
-                        </Button>
+                        </div>
                       )}
                     </div>
                     
@@ -498,25 +593,48 @@ export default function CalendarPage() {
                         </span>
                       </div>
                       {selectedGroupId && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "h-8 w-8",
-                            meal ? "text-red-500 hover:text-red-600" : ""
+                        <div className="flex items-center gap-1">
+                          {meal ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-500 hover:text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                deleteMeal(dateStr)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedDate(day)
+                                  setShowAddMeal(true)
+                                }}
+                              >
+                                <PlusCircle className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                disabled={randomizingDate === dateStr}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleRandomMeal(day)
+                                }}
+                              >
+                                <Dice5 className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (meal) {
-                              deleteMeal(dateStr)
-                            } else {
-                              setSelectedDate(day)
-                              setShowAddMeal(true)
-                            }
-                          }}
-                        >
-                          {meal ? <Trash2 className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
-                        </Button>
+                        </div>
                       )}
                     </div>
                     
@@ -545,32 +663,7 @@ export default function CalendarPage() {
           groupId={selectedGroupId}
           date={selectedDate}
           onMealAdded={async () => {
-            // Fetch updated meals for the current week/month
-            const start = window.innerWidth >= 640 
-              ? startOfMonth(currentDate)
-              : mobileWeekStart
-            const end = window.innerWidth >= 640
-              ? endOfMonth(currentDate)
-              : endOfWeek(mobileWeekStart)
-
-            const { data, error } = await supabase
-              .from('meal_calendar')
-              .select('date, meal:meals(id, name, category)')
-              .eq('group_id', selectedGroupId)
-              .gte('date', start.toISOString().split('T')[0])
-              .lte('date', end.toISOString().split('T')[0])
-
-            if (error) {
-              console.error('Error refreshing calendar:', error)
-              return
-            }
-
-            const meals = data.reduce((acc, item) => ({
-              ...acc,
-              [item.date]: item.meal
-            }), {})
-
-            setCalendarMeals(meals)
+            await refreshCalendarMeals()
           }}
         />
       )}
@@ -587,4 +680,3 @@ export default function CalendarPage() {
     </div>
   )
 }
-
