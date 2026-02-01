@@ -39,7 +39,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Set database URL
+        run: |
+          if [ "${{ inputs.environment }}" = "production" ]; then
+            if [ -z "${{ secrets.PROD_DATABASE_URL }}" ]; then
+              echo "PROD_DATABASE_URL secret is required for production migrations" >&2
+              exit 1
+            fi
+            echo "DATABASE_URL=${{ secrets.PROD_DATABASE_URL }}" >> "$GITHUB_ENV"
+          else
+            if [ -z "${{ secrets.STAGING_DATABASE_URL }}" ]; then
+              echo "STAGING_DATABASE_URL secret is required for staging migrations" >&2
+              exit 1
+            fi
+            echo "DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }}" >> "$GITHUB_ENV"
+          fi
+
       - name: Run migrations
-        env:
-          DATABASE_URL: ${{ inputs.environment == 'production' && secrets.PROD_DATABASE_URL || secrets.STAGING_DATABASE_URL }}
         run: npm run db:migrate
