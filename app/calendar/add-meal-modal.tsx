@@ -6,6 +6,14 @@ import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
+import { MEAL_CATEGORIES } from '@/app/meals/meal-utils'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
 
 type Meal = {
   id: string
@@ -26,6 +34,7 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
   const [selectedMealId, setSelectedMealId] = useState<string>('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
   useEffect(() => {
     if (!open || !groupId) return
@@ -75,9 +84,11 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
     }
   }
 
-  const filteredMeals = meals.filter(meal => 
-    meal.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredMeals = meals.filter(meal => {
+    const matchesName = meal.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory = selectedCategory === 'all' || meal.category === selectedCategory
+    return matchesName && matchesCategory
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,7 +99,7 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
 
         <div className="flex-1 overflow-y-auto pr-2">
           <form id="add-meal-form" onSubmit={handleSubmit} className="space-y-4">
-            <div className="relative">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] sm:items-center">
               <Input
                 type="search"
                 placeholder="Search meals..."
@@ -96,6 +107,19 @@ export function AddMealModal({ open, onOpenChange, groupId, date, onMealAdded }:
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20"
               />
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="bg-white/50 border-[#98C1B2]/30 focus:border-[#98C1B2] focus:ring-[#98C1B2]/20">
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All categories</SelectItem>
+                  {Object.values(MEAL_CATEGORIES).map((category) => (
+                    <SelectItem key={category} value={category}>
+                      {category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid gap-4">
