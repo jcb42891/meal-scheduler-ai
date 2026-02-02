@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Chip } from "@/components/ui/chip"
-import { ChevronLeft, ChevronRight, Dice5, Loader2, Moon, MoonStar, Plus, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Dice5, Moon, MoonStar, Plus, Trash2 } from "lucide-react"
 import {
   format,
   addMonths,
@@ -407,25 +407,43 @@ export default function CalendarPage() {
     )
   }
 
-  const loadingOverlay = (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-sm">
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-border/60 bg-card/90 px-5 py-4 shadow-lg">
-        <div className="flex items-center gap-3">
-          <span className="relative flex h-10 w-10 items-center justify-center">
-            <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
-            <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Loading calendar</p>
-            <p className="text-xs text-muted-foreground">Fetching meals for this range…</p>
+  const desktopLoadingOverlay = (
+    <div className="absolute inset-0 z-10 grid grid-cols-7 bg-background/60 backdrop-blur-sm">
+      {days.map((day) => (
+        <div
+          key={`loading-${day.toISOString()}`}
+          className="min-h-[92px] sm:min-h-[108px] border-b border-r border-border/60 p-2.5"
+        >
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-6 rounded-full bg-surface-2 animate-pulse" />
+            <div className="h-4 w-4 rounded-full bg-surface-2 animate-pulse" />
+          </div>
+          <div className="mt-3 space-y-2">
+            <div className="h-3 w-16 rounded-full bg-surface-2 animate-pulse" />
+            <div className="h-3 w-24 rounded-full bg-surface-2 animate-pulse" />
           </div>
         </div>
-        <div className="flex w-full gap-2">
-          <div className="h-2 flex-1 rounded-full bg-surface-2 animate-pulse" />
-          <div className="h-2 flex-1 rounded-full bg-surface-2 animate-pulse [animation-delay:150ms]" />
-          <div className="h-2 flex-1 rounded-full bg-surface-2 animate-pulse [animation-delay:300ms]" />
+      ))}
+    </div>
+  )
+
+  const mobileLoadingOverlay = (
+    <div className="absolute inset-0 z-10 flex flex-col gap-2 bg-background/60 backdrop-blur-sm p-3">
+      {mobileDays.map((day) => (
+        <div
+          key={`mobile-loading-${day.toISOString()}`}
+          className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-20 rounded-full bg-surface-2 animate-pulse" />
+            <div className="h-4 w-4 rounded-full bg-surface-2 animate-pulse" />
+          </div>
+          <div className="mt-3 space-y-2">
+            <div className="h-3 w-32 rounded-full bg-surface-2 animate-pulse" />
+            <div className="h-3 w-24 rounded-full bg-surface-2 animate-pulse" />
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   )
 
@@ -507,7 +525,7 @@ export default function CalendarPage() {
 
           <div className="hidden sm:block">
             <div className="grid grid-cols-7 border border-border/60 rounded-lg overflow-hidden relative">
-              {isMonthLoading && loadingOverlay}
+              {isMonthLoading && desktopLoadingOverlay}
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName) => (
                 <div
                   key={dayName}
@@ -655,7 +673,7 @@ export default function CalendarPage() {
 
           <div className="sm:hidden">
             <div className="flex flex-col gap-2 relative">
-              {isMonthLoading && loadingOverlay}
+              {isMonthLoading && mobileLoadingOverlay}
               {mobileDays.map((day) => {
                 const dateStr = format(day, "yyyy-MM-dd")
                 const meal = calendarMeals[dateStr]
