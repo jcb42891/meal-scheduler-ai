@@ -433,8 +433,9 @@ export default function CalendarPage() {
             <Button
               onClick={handleGenerateList}
               data-grocery-button
-              variant="secondary"
-              className="w-full sm:w-auto"
+              variant="default"
+              size="lg"
+              className="w-full sm:w-auto font-semibold shadow-md hover:shadow-lg"
             >
               Generate Grocery List
             </Button>
