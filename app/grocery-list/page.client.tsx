@@ -200,9 +200,7 @@ export function GroceryListClient() {
   }
 
   const copyToClipboard = () => {
-    const text = combinedItems
-      .map((item) => `${item.name}: ${item.total} ${item.unit}`)
-      .join('\n')
+    const text = combinedItems.map((item) => `${item.name}: ${item.total}`).join('\n')
     navigator.clipboard.writeText(text)
     toast.success('Copied to clipboard')
   }
@@ -273,8 +271,8 @@ export function GroceryListClient() {
                           />
                           <span className="text-sm font-medium">{item.name}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {item.total} {item.unit}
+                        <span className="inline-flex min-w-9 items-center justify-center rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                          {item.total}
                         </span>
                       </label>
                     ))}
@@ -308,8 +306,8 @@ export function GroceryListClient() {
                             <Chip className="text-xs">{item.category}</Chip>
                           )}
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {item.total} {item.unit}
+                        <span className="inline-flex min-w-9 items-center justify-center rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                          {item.total}
                         </span>
                       </label>
                     ))}
@@ -323,30 +321,32 @@ export function GroceryListClient() {
                 {combinedItems.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No items selected.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {combinedItems.map((item) => (
-                      <div
-                        key={item.key}
-                        className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card p-3"
-                      >
-                        <span className="text-sm font-medium">{item.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {item.total} {item.unit}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      <Button onClick={copyToClipboard} variant="secondary">
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy to Clipboard
+                      </Button>
+                      <Button onClick={handlePrint} variant="outline">
+                        <Download className="h-4 w-4 mr-2" />
+                        Download PDF
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {combinedItems.map((item) => (
+                        <div
+                          key={item.key}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card p-3"
+                        >
+                          <span className="text-sm font-medium">{item.name}</span>
+                          <span className="inline-flex min-w-9 items-center justify-center rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
+                            {item.total}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
-                <div className="flex flex-wrap gap-2 pt-4">
-                  <Button onClick={copyToClipboard} variant="secondary">
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy to Clipboard
-                  </Button>
-                  <Button onClick={handlePrint} variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download PDF
-                  </Button>
-                </div>
               </div>
             )}
           </CardContent>
@@ -360,12 +360,11 @@ export function GroceryListClient() {
           >
             Back
           </Button>
-          <Button
-            onClick={() => setStep((prev) => Math.min(STEP_LABELS.length - 1, prev + 1))}
-            disabled={step === STEP_LABELS.length - 1}
-          >
-            {step === STEP_LABELS.length - 2 ? 'Generate Final List' : 'Next'}
-          </Button>
+          {step < STEP_LABELS.length - 1 && (
+            <Button onClick={() => setStep((prev) => Math.min(STEP_LABELS.length - 1, prev + 1))}>
+              {step === STEP_LABELS.length - 2 ? 'Generate Final List' : 'Next'}
+            </Button>
+          )}
         </div>
       </div>
     </div>
