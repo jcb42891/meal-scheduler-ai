@@ -49,6 +49,7 @@ export default function CalendarPage() {
   }>({ start: null, end: null })
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [isMonthLoading, setIsMonthLoading] = useState(false)
+  const [hasLoadedMeals, setHasLoadedMeals] = useState(false)
   const [mobileWeekStart, setMobileWeekStart] = useState(startOfWeek(new Date()))
   const [randomizingDate, setRandomizingDate] = useState<string | null>(null)
 
@@ -124,6 +125,7 @@ export default function CalendarPage() {
     if (selectedGroupId) {
       const fetchMeals = async () => {
         if (!mounted) return
+        setHasLoadedMeals(false)
         setIsMonthLoading(true)
         
         try {
@@ -154,11 +156,15 @@ export default function CalendarPage() {
         } finally {
           if (mounted) {
             setIsMonthLoading(false)
+            setHasLoadedMeals(true)
           }
         }
       }
 
       fetchMeals()
+    } else {
+      setHasLoadedMeals(true)
+      setIsMonthLoading(false)
     }
 
     return () => {
@@ -407,6 +413,48 @@ export default function CalendarPage() {
     )
   }
 
+  const showLoadingState = isMonthLoading || !hasLoadedMeals
+
+  const desktopLoadingOverlay = (
+    <div className="absolute inset-0 z-10 grid grid-cols-7 bg-background/60 backdrop-blur-sm">
+      {days.map((day) => (
+        <div
+          key={`loading-${day.toISOString()}`}
+          className="min-h-[92px] sm:min-h-[108px] border-b border-r border-border/60 p-2.5"
+        >
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-6 rounded-full bg-surface-2 animate-pulse" />
+            <div className="h-4 w-4 rounded-full bg-surface-2 animate-pulse" />
+          </div>
+          <div className="mt-3 space-y-2">
+            <div className="h-3 w-16 rounded-full bg-surface-2 animate-pulse" />
+            <div className="h-3 w-24 rounded-full bg-surface-2 animate-pulse" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
+  const mobileLoadingOverlay = (
+    <div className="absolute inset-0 z-10 flex flex-col gap-2 bg-background/60 backdrop-blur-sm p-3">
+      {mobileDays.map((day) => (
+        <div
+          key={`mobile-loading-${day.toISOString()}`}
+          className="rounded-xl border border-border/60 bg-card/70 p-3 shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <div className="h-3 w-20 rounded-full bg-surface-2 animate-pulse" />
+            <div className="h-4 w-4 rounded-full bg-surface-2 animate-pulse" />
+          </div>
+          <div className="mt-3 space-y-2">
+            <div className="h-3 w-32 rounded-full bg-surface-2 animate-pulse" />
+            <div className="h-3 w-24 rounded-full bg-surface-2 animate-pulse" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <div className="min-h-screen space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -486,9 +534,7 @@ export default function CalendarPage() {
 
           <div className="hidden sm:block">
             <div className="grid grid-cols-7 border border-border/60 rounded-lg overflow-hidden relative">
-              {isMonthLoading && (
-                <div className="absolute inset-0 bg-background/80 z-10 transition-opacity duration-200" />
-              )}
+              {showLoadingState && desktopLoadingOverlay}
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName) => (
                 <div
                   key={dayName}
@@ -636,9 +682,7 @@ export default function CalendarPage() {
 
           <div className="sm:hidden">
             <div className="flex flex-col gap-2 relative">
-              {isMonthLoading && (
-                <div className="absolute inset-0 bg-background/80 z-10 transition-opacity duration-200" />
-              )}
+              {showLoadingState && mobileLoadingOverlay}
               {mobileDays.map((day) => {
                 const dateStr = format(day, "yyyy-MM-dd")
                 const meal = calendarMeals[dateStr]
