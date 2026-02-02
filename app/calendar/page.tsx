@@ -49,6 +49,7 @@ export default function CalendarPage() {
   }>({ start: null, end: null })
   const [isAuthChecking, setIsAuthChecking] = useState(true)
   const [isMonthLoading, setIsMonthLoading] = useState(false)
+  const [hasLoadedMeals, setHasLoadedMeals] = useState(false)
   const [mobileWeekStart, setMobileWeekStart] = useState(startOfWeek(new Date()))
   const [randomizingDate, setRandomizingDate] = useState<string | null>(null)
 
@@ -124,6 +125,7 @@ export default function CalendarPage() {
     if (selectedGroupId) {
       const fetchMeals = async () => {
         if (!mounted) return
+        setHasLoadedMeals(false)
         setIsMonthLoading(true)
         
         try {
@@ -154,11 +156,15 @@ export default function CalendarPage() {
         } finally {
           if (mounted) {
             setIsMonthLoading(false)
+            setHasLoadedMeals(true)
           }
         }
       }
 
       fetchMeals()
+    } else {
+      setHasLoadedMeals(true)
+      setIsMonthLoading(false)
     }
 
     return () => {
@@ -407,6 +413,8 @@ export default function CalendarPage() {
     )
   }
 
+  const showLoadingState = isMonthLoading || !hasLoadedMeals
+
   const desktopLoadingOverlay = (
     <div className="absolute inset-0 z-10 grid grid-cols-7 bg-background/60 backdrop-blur-sm">
       {days.map((day) => (
@@ -525,7 +533,7 @@ export default function CalendarPage() {
 
           <div className="hidden sm:block">
             <div className="grid grid-cols-7 border border-border/60 rounded-lg overflow-hidden relative">
-              {isMonthLoading && desktopLoadingOverlay}
+              {showLoadingState && desktopLoadingOverlay}
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName) => (
                 <div
                   key={dayName}
@@ -673,7 +681,7 @@ export default function CalendarPage() {
 
           <div className="sm:hidden">
             <div className="flex flex-col gap-2 relative">
-              {isMonthLoading && mobileLoadingOverlay}
+              {showLoadingState && mobileLoadingOverlay}
               {mobileDays.map((day) => {
                 const dateStr = format(day, "yyyy-MM-dd")
                 const meal = calendarMeals[dateStr]
