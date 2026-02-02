@@ -14,7 +14,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 export function Navbar() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, loading } = useAuth()
   const pathname = usePathname()
 
   const navItems = [
@@ -35,7 +35,7 @@ export function Navbar() {
 
           {/* Desktop menu */}
           <div className="hidden sm:flex items-center gap-8">
-            {user && navItems.map(item => (
+            {!loading && user && navItems.map(item => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -51,7 +51,9 @@ export function Navbar() {
             ))}
           </div>
 
-          {user ? (
+          {loading ? (
+            <div className="h-8 w-8 rounded-full bg-muted/60 animate-pulse" aria-hidden="true" />
+          ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">

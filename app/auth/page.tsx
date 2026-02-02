@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
@@ -15,6 +16,7 @@ import authBgImage from '@/public/auth-bg.jpg'
 
 export default function AuthPage() {
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -36,6 +38,16 @@ export default function AuthPage() {
     }
     checkSession()
   }, [router])
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/calendar')
+    }
+  }, [authLoading, router, user])
+
+  if (authLoading || user) {
+    return <div className="min-h-[calc(100vh-4rem)]" />
+  }
 
   console.log('Auth page rendered', new Date().toISOString())
 
