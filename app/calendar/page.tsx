@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Chip } from "@/components/ui/chip"
-import { ChevronLeft, ChevronRight, Dice5, Moon, MoonStar, Plus, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Dice5, Loader2, Moon, MoonStar, Plus, Trash2 } from "lucide-react"
 import {
   format,
   addMonths,
@@ -407,6 +407,28 @@ export default function CalendarPage() {
     )
   }
 
+  const loadingOverlay = (
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-3 rounded-xl border border-border/60 bg-card/90 px-5 py-4 shadow-lg">
+        <div className="flex items-center gap-3">
+          <span className="relative flex h-10 w-10 items-center justify-center">
+            <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+            <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Loading calendar</p>
+            <p className="text-xs text-muted-foreground">Fetching meals for this range…</p>
+          </div>
+        </div>
+        <div className="flex w-full gap-2">
+          <div className="h-2 flex-1 rounded-full bg-surface-2 animate-pulse" />
+          <div className="h-2 flex-1 rounded-full bg-surface-2 animate-pulse [animation-delay:150ms]" />
+          <div className="h-2 flex-1 rounded-full bg-surface-2 animate-pulse [animation-delay:300ms]" />
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -485,9 +507,7 @@ export default function CalendarPage() {
 
           <div className="hidden sm:block">
             <div className="grid grid-cols-7 border border-border/60 rounded-lg overflow-hidden relative">
-              {isMonthLoading && (
-                <div className="absolute inset-0 bg-background/80 z-10 transition-opacity duration-200" />
-              )}
+              {isMonthLoading && loadingOverlay}
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName) => (
                 <div
                   key={dayName}
@@ -635,9 +655,7 @@ export default function CalendarPage() {
 
           <div className="sm:hidden">
             <div className="flex flex-col gap-2 relative">
-              {isMonthLoading && (
-                <div className="absolute inset-0 bg-background/80 z-10 transition-opacity duration-200" />
-              )}
+              {isMonthLoading && loadingOverlay}
               {mobileDays.map((day) => {
                 const dateStr = format(day, "yyyy-MM-dd")
                 const meal = calendarMeals[dateStr]
