@@ -20,8 +20,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Trash2, Pencil } from 'lucide-react'
+import { Eye, Trash2, Pencil } from 'lucide-react'
 import { EditMealDialog } from './edit-meal-dialog'
+import { ViewMealDialog } from './view-meal-dialog'
 import { cn } from '@/lib/utils'
 import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from './meal-utils'
 import { MealFilterRack, WeeknightFilterOption } from '@/components/meal-filter-rack'
@@ -51,6 +52,7 @@ export default function MealsPage() {
   const [mealToDelete, setMealToDelete] = useState<Meal | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [mealToEdit, setMealToEdit] = useState<Meal | null>(null)
+  const [mealToView, setMealToView] = useState<Meal | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [weeknightFilter, setWeeknightFilter] = useState<'all' | 'friendly' | 'not-friendly'>('all')
@@ -268,18 +270,24 @@ export default function MealsPage() {
                         </p>
                       )}
                     </div>
-                  <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
-                    {meal.category && (
-                      <Chip className={cn("text-xs", getCategoryColor(meal.category as MealCategory))}>
-                        {meal.category}
-                      </Chip>
-                    )}
-                    {meal.weeknight_friendly && (
-                      <Chip className={cn("text-xs", getWeeknightFriendlyColor())}>
-                        {WEEKNIGHT_FRIENDLY_LABEL}
-                      </Chip>
-                    )}
-                    <div className="flex items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                    <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
+                      {meal.category && (
+                        <Chip className={cn("text-xs", getCategoryColor(meal.category as MealCategory))}>
+                          {meal.category}
+                        </Chip>
+                      )}
+                      {meal.weeknight_friendly && (
+                        <Chip className={cn("text-xs", getWeeknightFriendlyColor())}>
+                          {WEEKNIGHT_FRIENDLY_LABEL}
+                        </Chip>
+                      )}
+                      <div className="flex items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                        <IconButton
+                          aria-label={`View ${meal.name}`}
+                          onClick={() => setMealToView(meal)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </IconButton>
                         <IconButton
                           aria-label={`Edit ${meal.name}`}
                           onClick={() => setMealToEdit(meal)}
@@ -315,6 +323,12 @@ export default function MealsPage() {
         onOpenChange={(open) => !open && setMealToEdit(null)}
         meal={mealToEdit}
         onMealUpdated={fetchMeals}
+      />
+
+      <ViewMealDialog
+        open={!!mealToView}
+        onOpenChange={(open) => !open && setMealToView(null)}
+        meal={mealToView}
       />
 
       <AlertDialog open={!!mealToDelete} onOpenChange={(open) => !open && setMealToDelete(null)}>
