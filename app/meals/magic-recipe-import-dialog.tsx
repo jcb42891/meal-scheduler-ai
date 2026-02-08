@@ -13,7 +13,7 @@ import { useAuth } from '@/lib/contexts/AuthContext'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from './meal-utils'
-import { Plus, Sparkles, X } from 'lucide-react'
+import { Loader2, Plus, Sparkles, X } from 'lucide-react'
 
 type Props = {
   open: boolean
@@ -59,6 +59,18 @@ const ALLOWED_UNITS = [
   { value: 'cup', label: 'cups' },
 ] as const
 
+const PARSE_LOADING_MESSAGES = [
+  'Teaching the meal wizard new tricks...',
+  'Simmering your recipe into structured magic...',
+  'Whisking ingredients into neat little rows...',
+  'Consulting the spice oracle...',
+  'Untangling steps, one noodle at a time...',
+  'Converting kitchen chaos into dinner plans...',
+  'Sprinkling a little parser pixie dust...',
+  'Finding the “pinch of salt” in all that text...',
+  'Preheating the import engine...',
+]
+
 function makeRowId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -88,15 +100,20 @@ function toTitleCase(value: string) {
     .join(' ')
 }
 
+function getRandomParseLoadingMessage() {
+  return PARSE_LOADING_MESSAGES[Math.floor(Math.random() * PARSE_LOADING_MESSAGES.length)]
+}
+
 export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImported }: Props) {
   const { user } = useAuth()
   const [step, setStep] = useState<'input' | 'review'>('input')
-  const [sourceType, setSourceType] = useState<'image' | 'url' | 'text'>('text')
+  const [sourceType, setSourceType] = useState<'image' | 'url' | 'text'>('url')
   const [sourceUrl, setSourceUrl] = useState('')
   const [sourceText, setSourceText] = useState('')
   const [sourceImage, setSourceImage] = useState<File | null>(null)
   const [parseWarnings, setParseWarnings] = useState<string[]>([])
   const [parseConfidence, setParseConfidence] = useState<number | null>(null)
+  const [parseLoadingMessage, setParseLoadingMessage] = useState(PARSE_LOADING_MESSAGES[0])
   const [isParsing, setIsParsing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -133,7 +150,7 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
   useEffect(() => {
     if (open) return
     setStep('input')
-    setSourceType('text')
+    setSourceType('url')
     setSourceUrl('')
     setSourceText('')
     setSourceImage(null)
@@ -167,6 +184,7 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
       return
     }
 
+    setParseLoadingMessage(getRandomParseLoadingMessage())
     setIsParsing(true)
     try {
       const formData = new FormData()
@@ -390,6 +408,16 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
                   />
                 </TabsContent>
               </Tabs>
+
+              {isParsing && (
+                <div className="rounded-[10px] border border-border/60 bg-surface-2/40 p-3 text-sm">
+                  <p className="flex items-center gap-2 font-medium text-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {parseLoadingMessage}
+                  </p>
+                  <p className="mt-1 text-muted-foreground">This can take up to 15 seconds for complex recipes.</p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -578,7 +606,14 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
           </Button>
           {step === 'input' ? (
             <Button type="button" onClick={handleParse} disabled={isParsing || !groupId}>
-              {isParsing ? 'Parsing...' : 'Parse Recipe'}
+              {isParsing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Parsing...
+                </>
+              ) : (
+                'Parse Recipe'
+              )}
             </Button>
           ) : (
             <Button type="button" onClick={handleSave} disabled={isSaving}>
