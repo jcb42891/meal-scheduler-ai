@@ -78,11 +78,6 @@ function makeRowId() {
   return `row-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-function formatConfidence(confidence: number | null) {
-  if (typeof confidence !== 'number') return 'N/A'
-  return `${Math.round(confidence * 100)}%`
-}
-
 function mergeDescription(description: string, instructionsText: string) {
   const base = description.trim()
   const instructions = instructionsText.trim()
@@ -111,8 +106,6 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
   const [sourceUrl, setSourceUrl] = useState('')
   const [sourceText, setSourceText] = useState('')
   const [sourceImage, setSourceImage] = useState<File | null>(null)
-  const [parseWarnings, setParseWarnings] = useState<string[]>([])
-  const [parseConfidence, setParseConfidence] = useState<number | null>(null)
   const [parseLoadingMessage, setParseLoadingMessage] = useState(PARSE_LOADING_MESSAGES[0])
   const [isParsing, setIsParsing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -154,8 +147,6 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
     setSourceUrl('')
     setSourceText('')
     setSourceImage(null)
-    setParseWarnings([])
-    setParseConfidence(null)
     setMealName('')
     setDescription('')
     setInstructionsText('')
@@ -209,8 +200,6 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
       setCategory(data.recipe.category || '')
       setWeeknightFriendly(Boolean(data.recipe.weeknightFriendly))
       setInstructionsText((data.recipe.instructions || []).join('\n'))
-      setParseWarnings(data.recipe.warnings || [])
-      setParseConfidence(data.recipe.confidence ?? null)
       setEditableIngredients(
         (data.recipe.ingredients || []).map((ingredient) => ({
           rowId: makeRowId(),
@@ -421,17 +410,6 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-[10px] border border-border/60 bg-surface-2/40 p-3 text-sm">
-                <p className="font-medium text-foreground">Parse confidence: {formatConfidence(parseConfidence)}</p>
-                {parseWarnings.length > 0 && (
-                  <ul className="mt-2 list-disc pl-5 text-muted-foreground space-y-1">
-                    {parseWarnings.map((warning, index) => (
-                      <li key={`${warning}-${index}`}>{warning}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="import-name">Meal name</Label>
                 <Input id="import-name" value={mealName} onChange={(event) => setMealName(event.target.value)} />
@@ -609,10 +587,13 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
               {isParsing ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Parsing...
+                  Importing...
                 </>
               ) : (
-                'Parse Recipe'
+                <>
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  Import
+                </>
               )}
             </Button>
           ) : (
