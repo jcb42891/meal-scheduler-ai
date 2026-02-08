@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { Plus, Trash2 } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { PageHeader } from '@/components/page-header'
 
 type Group = {
   id: string
@@ -159,16 +160,23 @@ export default function GroupsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Groups</h1>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Group
-        </Button>
-      </div>
+      <PageHeader
+        title="Groups"
+        description="Organize planning spaces for your household and collaborators."
+        actions={
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Group
+          </Button>
+        }
+      />
 
       {loading ? (
-        <div className="text-center text-muted-foreground">Loading groups...</div>
+        <Card className="border-dashed">
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Loading groups...
+          </CardContent>
+        </Card>
       ) : groups.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
@@ -193,7 +201,7 @@ export default function GroupsPage() {
                 )}
               </CardHeader>
               <CardContent>
-                <div className="flex justify-end space-x-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <Button 
                     variant="outline" 
                     onClick={() => router.push(`/calendar?group=${group.id}`)}

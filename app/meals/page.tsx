@@ -20,13 +20,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Eye, Trash2, Pencil } from 'lucide-react'
+import { Eye, Trash2, Pencil, Sparkles } from 'lucide-react'
 import { EditMealDialog } from './edit-meal-dialog'
 import { ViewMealDialog } from './view-meal-dialog'
 import { MagicRecipeImportDialog } from './magic-recipe-import-dialog'
 import { cn } from '@/lib/utils'
 import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from './meal-utils'
 import { MealFilterRack, WeeknightFilterOption } from '@/components/meal-filter-rack'
+import { PageHeader } from '@/components/page-header'
 
 type Group = {
   id: string
@@ -217,18 +218,34 @@ export default function MealsPage() {
     }
   }
 
+  const selectedMealCount = selectedMealIds.size
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Meal Library</h1>
-          <p className="text-sm text-muted-foreground">Browse and manage meals for your household.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <PageHeader
+        title="Meal Library"
+        description="Browse and manage meals for your household."
+        actions={
+          <>
+            <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
+              Create Meal
+            </Button>
+            <Button
+              onClick={() => setShowMagicImportDialog(true)}
+              variant="secondary"
+              className="w-full sm:w-auto border-accent/40 bg-accent/85 text-accent-foreground hover:bg-accent"
+              disabled={!selectedGroupId}
+            >
+              <Sparkles className="h-4 w-4" />
+              Magic Import
+            </Button>
+          </>
+        }
+        context={
           <select
             value={selectedGroupId}
             onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="h-10 w-full sm:w-[220px] rounded-[10px] border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+            className="h-10 w-full sm:w-[260px] rounded-md border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
           >
             <option value="">Select a group</option>
             {userGroups.map((group) => (
@@ -237,26 +254,36 @@ export default function MealsPage() {
               </option>
             ))}
           </select>
-          <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
-            Create Meal
-          </Button>
-          <Button
-            onClick={() => setShowMagicImportDialog(true)}
-            variant="secondary"
-            className="w-full sm:w-auto"
-            disabled={!selectedGroupId}
-          >
-            Magic Import
-          </Button>
-          <Button
-            onClick={handleGenerateOneOffList}
-            className="w-full sm:w-auto"
-            disabled={!selectedGroupId || selectedMealIds.size === 0}
-          >
-            Build Grocery List ({selectedMealIds.size})
-          </Button>
-        </div>
-      </div>
+        }
+        footer={
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              {selectedMealCount > 0
+                ? `${selectedMealCount} meal${selectedMealCount === 1 ? '' : 's'} selected for one-off grocery list.`
+                : 'Select meals from the list below to build a one-off grocery list.'}
+            </p>
+            <div className="flex w-full gap-2 sm:w-auto">
+              {selectedMealCount > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full sm:w-auto"
+                  onClick={() => setSelectedMealIds(new Set())}
+                >
+                  Clear
+                </Button>
+              )}
+              <Button
+                onClick={handleGenerateOneOffList}
+                className="w-full sm:w-auto"
+                disabled={!selectedGroupId || selectedMealCount === 0}
+              >
+                Build Grocery List{selectedMealCount > 0 ? ` (${selectedMealCount})` : ''}
+              </Button>
+            </div>
+          </div>
+        }
+      />
 
       <Card>
         <CardHeader className="space-y-4 pb-4">

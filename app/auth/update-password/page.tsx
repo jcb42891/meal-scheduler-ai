@@ -35,10 +35,10 @@ export default function UpdatePasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-md border-border/80 bg-card/95">
         <CardHeader>
-          <h2 className="text-2xl font-bold text-center">Update Password</h2>
+          <h2 className="text-center text-2xl font-semibold tracking-tight">Update Password</h2>
           <p className="text-sm text-muted-foreground text-center">
             Enter your new password below
           </p>

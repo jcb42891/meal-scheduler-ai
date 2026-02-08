@@ -38,15 +38,15 @@ export default function UpdatePasswordPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-10">
+      <Card className="w-full max-w-md border-border/80 bg-card/95">
         <CardHeader>
-          <h1 className="text-2xl font-bold text-center">Update Password</h1>
+          <h1 className="text-center text-2xl font-semibold tracking-tight">Update Password</h1>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-gray-500">
+              <label className="text-sm font-medium text-muted-foreground">
                 New Password
               </label>
               <Input

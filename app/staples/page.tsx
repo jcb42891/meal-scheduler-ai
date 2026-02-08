@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Trash2, Pencil } from 'lucide-react'
 import { EditStapleDialog } from './edit-staple-dialog'
+import { PageHeader } from '@/components/page-header'
 
 type Group = {
   id: string
@@ -169,16 +170,19 @@ export default function StaplesPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Staple Ingredients</h1>
-          <p className="text-sm text-muted-foreground">Manage the items you buy every trip.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <PageHeader
+        title="Staple Ingredients"
+        description="Manage the items you buy every trip."
+        actions={
+          <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
+            Add Staple
+          </Button>
+        }
+        context={
           <select
             value={selectedGroupId}
             onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="h-10 w-full sm:w-[220px] rounded-[10px] border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+            className="h-10 w-full sm:w-[260px] rounded-md border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
           >
             <option value="">Select a group</option>
             {userGroups.map((group) => (
@@ -187,11 +191,8 @@ export default function StaplesPage() {
               </option>
             ))}
           </select>
-          <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
-            Add Staple
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       <Card>
         <CardHeader className="space-y-3 pb-4">

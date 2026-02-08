@@ -162,13 +162,14 @@ export default function AuthPage() {
       />
       
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/20" />
+      <div className="absolute inset-0 bg-foreground/35" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/30 to-background/55" />
       
       {/* Content */}
-      <div className="relative z-10 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <Card className="w-full max-w-md bg-white/95 backdrop-blur-sm shadow-xl">
+      <div className="relative z-10 flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+        <Card className="w-full max-w-md border-border/80 bg-card/95 backdrop-blur-md shadow-xl">
           <CardHeader className="space-y-1">
-            <h2 className="text-2xl font-bold text-center">Welcome</h2>
+            <h2 className="text-center text-2xl font-semibold tracking-tight">Welcome</h2>
             <p className="text-sm text-muted-foreground text-center">
               Sign in to your account to continue
             </p>

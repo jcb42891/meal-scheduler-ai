@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { PageHeader } from '@/components/page-header'
 
 type Profile = {
   first_name: string | null
@@ -108,10 +109,11 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Profile</h1>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Profile"
+        description="Manage your account details and password settings."
+      />
       
       <Card>
         <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
@@ -140,13 +142,13 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-500">Email</label>
-            <p className="text-gray-900 break-all">{user?.email}</p>
+            <label className="text-sm font-medium text-muted-foreground">Email</label>
+            <p className="break-all text-foreground">{user?.email}</p>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-500">First Name</label>
+              <label className="text-sm font-medium text-muted-foreground">First Name</label>
               {isEditing ? (
                 <Input
                   value={firstName}
@@ -154,12 +156,12 @@ export default function ProfilePage() {
                   className="mt-1 w-full"
                 />
               ) : (
-                <p className="text-gray-900">{profile.first_name || '-'}</p>
+                <p className="text-foreground">{profile.first_name || '-'}</p>
               )}
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-500">Last Name</label>
+              <label className="text-sm font-medium text-muted-foreground">Last Name</label>
               {isEditing ? (
                 <Input
                   value={lastName}
@@ -167,7 +169,7 @@ export default function ProfilePage() {
                   className="mt-1 w-full"
                 />
               ) : (
-                <p className="text-gray-900">{profile.last_name || '-'}</p>
+                <p className="text-foreground">{profile.last_name || '-'}</p>
               )}
             </div>
 

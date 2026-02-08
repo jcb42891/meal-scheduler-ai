@@ -27,6 +27,7 @@ import { AddMealModal } from "./add-meal-modal"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from "@/app/meals/meal-utils"
 import { cn } from "@/lib/utils"
+import { PageHeader } from "@/components/page-header"
 
 type GroupMember = {
   group: {
@@ -456,15 +457,13 @@ export default function CalendarPage() {
   )
 
   return (
-    <div className="min-h-screen space-y-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Meal Calendar</h1>
-          <p className="text-sm text-muted-foreground">Plan meals for your household calendar.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+    <div className="space-y-5">
+      <PageHeader
+        title="Meal Calendar"
+        description="Plan meals for your household calendar."
+        context={
           <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
-            <SelectTrigger className="w-full sm:w-[220px] bg-card">
+            <SelectTrigger className="w-full sm:w-[260px] bg-card">
               <SelectValue placeholder="Select a group" />
             </SelectTrigger>
             <SelectContent>
@@ -476,20 +475,20 @@ export default function CalendarPage() {
               ))}
             </SelectContent>
           </Select>
-
-          {dateRange.start && (
+        }
+        actions={
+          dateRange.start ? (
             <Button
               onClick={handleGenerateList}
               data-grocery-button
               variant="default"
-              size="lg"
-              className="w-full sm:w-auto font-semibold shadow-md hover:shadow-lg"
+              className="w-full sm:w-auto"
             >
               Generate Grocery List
             </Button>
-          )}
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
       <div className="rounded-xl border border-border/60 bg-card shadow-sm">
         <div className="p-4 sm:p-5">

@@ -18,13 +18,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={GeistSans.className}>
       <head />
-      <body className="min-h-screen bg-background">
+      <body className="min-h-screen bg-background text-foreground">
         <AuthProvider>
           <Navbar />
-          <main className="container mx-auto px-4 py-5">
+          <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
             {children}
           </main>
-          <Toaster />
+          <Toaster offset={16} />
         </AuthProvider>
       </body>
     </html>

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { PageHeader } from '@/components/page-header'
 
 type Invitation = {
   id: string
@@ -224,12 +225,12 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          {group?.name || 'Loading...'}
-        </h1>
-        {!isOwner && (
+    <div className="space-y-5">
+      <PageHeader
+        title={group?.name || 'Loading...'}
+        description="Manage invitations, members, and group sharing access."
+        actions={
+          !isOwner ? (
           <Button 
             variant="destructive" 
             onClick={handleLeaveGroup}
@@ -238,8 +239,9 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
           >
             {isLeaving ? 'Leaving...' : 'Leave Group'}
           </Button>
-        )}
-      </div>
+          ) : null
+        }
+      />
 
       <Card>
         <CardHeader>
