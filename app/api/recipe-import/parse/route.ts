@@ -6,6 +6,7 @@ import { z, ZodError } from 'zod'
 import { importSourceTypeSchema, parseRequestJsonSchema } from '@/lib/recipe-import/schema'
 import { fetchRecipeTextFromUrl } from '@/lib/recipe-import/url'
 import { parseRecipeWithOpenAI } from '@/lib/recipe-import/openai'
+import { parseRecipeFromPlainTextFallback } from '@/lib/recipe-import/fallback'
 import { normalizeParsedRecipe } from '@/lib/recipe-import/normalize'
 import type { ImportSourceType } from '@/lib/recipe-import/types'
 
@@ -149,12 +150,25 @@ export async function POST(req: NextRequest) {
       sourceText = 'Extract the full recipe from this image. If text is unclear, add warnings.'
     }
 
-    const parsedRecipe = await parseRecipeWithOpenAI({
-      sourceType: input.sourceType,
-      sourceText,
-      imageDataUrl,
-      sourceUrl,
-    })
+    let parsedRecipe
+    try {
+      parsedRecipe = await parseRecipeWithOpenAI({
+        sourceType: input.sourceType,
+        sourceText,
+        imageDataUrl,
+        sourceUrl,
+      })
+    } catch (error) {
+      const fallbackParsedRecipe =
+        input.sourceType === 'image' ? null : parseRecipeFromPlainTextFallback(sourceText)
+
+      if (!fallbackParsedRecipe) {
+        throw error
+      }
+
+      warnings.push('AI parser could not fully read this recipe. Applied a text fallback parser.')
+      parsedRecipe = fallbackParsedRecipe
+    }
 
     const normalizedRecipe = normalizeParsedRecipe(parsedRecipe)
 
