@@ -79,6 +79,15 @@ function mergeDescription(description: string, instructionsText: string) {
   return `${base}\n\nInstructions:\n${instructions}`
 }
 
+function toTitleCase(value: string) {
+  return value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
 export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImported }: Props) {
   const { user } = useAuth()
   const [step, setStep] = useState<'input' | 'review'>('input')
@@ -222,11 +231,32 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
     const cleanedIngredients = editableIngredients
       .map((ingredient) => ({
         ...ingredient,
-        name: ingredient.name.trim(),
+        name: toTitleCase(ingredient.name.trim()),
       }))
       .filter((ingredient) => ingredient.name.length > 0)
 
-    if (cleanedIngredients.length === 0) {
+    const consolidatedIngredients = Array.from(
+      cleanedIngredients.reduce(
+        (acc, ingredient) => {
+          const key = ingredient.name.toLowerCase()
+          const existing = acc.get(key)
+          if (!existing) {
+            acc.set(key, {
+              name: ingredient.name,
+              quantity: ingredient.quantity > 0 ? ingredient.quantity : 1,
+              unit: ingredient.unit || 'unit',
+            })
+            return acc
+          }
+
+          existing.quantity += ingredient.quantity > 0 ? ingredient.quantity : 1
+          return acc
+        },
+        new Map<string, { name: string; quantity: number; unit: string }>(),
+      ).values(),
+    )
+
+    if (consolidatedIngredients.length === 0) {
       toast.error('At least one ingredient is required')
       return
     }
@@ -252,7 +282,7 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
       const mealIngredientRows: Array<{ meal_id: string; ingredient_id: string; quantity: number; unit: string }> = []
       const ingredientCache = new Map(ingredientNameMap)
 
-      for (const ingredient of cleanedIngredients) {
+      for (const ingredient of consolidatedIngredients) {
         const lookup = ingredient.name.toLowerCase()
         let matched = ingredientCache.get(lookup)
 
@@ -264,16 +294,16 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
             .single()
 
           if (createIngredientError) {
-            const { data: existingIngredient, error: existingIngredientError } = await supabase
+            const { data: existingIngredients, error: existingIngredientError } = await supabase
               .from('ingredients')
               .select('*')
-              .eq('name', ingredient.name)
-              .single()
+              .ilike('name', ingredient.name)
+              .limit(1)
 
-            if (existingIngredientError || !existingIngredient) {
+            if (existingIngredientError || !existingIngredients?.[0]) {
               throw createIngredientError
             }
-            matched = existingIngredient
+            matched = existingIngredients[0]
           } else {
             matched = createdIngredient
             setIngredients((prev) => [...prev, createdIngredient])
@@ -302,7 +332,7 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
       onOpenChange(false)
     } catch (error) {
       console.error('Error saving imported meal:', error)
-      toast.error('Failed to save imported meal')
+      toast.error(error instanceof Error ? error.message : 'Failed to save imported meal')
     } finally {
       setIsSaving(false)
     }
