@@ -26,13 +26,10 @@ export default function AuthPage() {
   const [isResetting, setIsResetting] = useState(false)
   const [activeTab, setActiveTab] = useState('signin')
 
-  // Add session check on mount
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      console.log('Initial session check:', session)
       if (session) {
-        console.log('Session exists, redirecting to calendar')
         router.replace('/calendar')
       }
     }
@@ -49,8 +46,6 @@ export default function AuthPage() {
     return <div className="min-h-[calc(100vh-4rem)]" />
   }
 
-  console.log('Auth page rendered', new Date().toISOString())
-
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -61,8 +56,6 @@ export default function AuthPage() {
         email,
         password
       })
-
-      console.log('Sign up response:', { authData, authError })
 
       if (authError) {
         setError(authError.message)
@@ -78,7 +71,7 @@ export default function AuthPage() {
           ])
 
         if (profileError) {
-          console.error('Profile creation error:', profileError)
+          console.error('Profile creation failed')
         }
       }
 
@@ -86,8 +79,8 @@ export default function AuthPage() {
       setActiveTab('signin')
       setEmail('')
       setPassword('')
-    } catch (err) {
-      console.error('Sign up error:', err)
+    } catch {
+      console.error('Sign up failed')
       toast.error('An error occurred during sign up')
     } finally {
       setLoading(false)
@@ -100,21 +93,20 @@ export default function AuthPage() {
     setError(null)
 
     try {
-      const { error, data } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
-        console.error('Sign in error details:', error)
+        console.error('Sign in failed')
         setError(error.message)
         return
       }
 
-      console.log('Sign in successful:', data)
       router.replace('/calendar')
-    } catch (err) {
-      console.error('Sign in error:', err)
+    } catch {
+      console.error('Sign in failed')
       setError('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -136,14 +128,14 @@ export default function AuthPage() {
 
       if (error) {
         toast.error('Failed to send reset email')
-        console.error('Reset password error:', error)
+        console.error('Password reset failed')
       } else {
         toast.success('Password reset email sent')
         setShowForgotPassword(false)
         setResetEmail('')
       }
-    } catch (err) {
-      console.error('Error:', err)
+    } catch {
+      console.error('Password reset request failed')
       toast.error('An error occurred')
     } finally {
       setIsResetting(false)

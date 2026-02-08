@@ -118,7 +118,7 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
     setIsSubmitting(true)
     try {
       // Update meal
-      const { data: updatedMeal, error: mealError } = await supabase
+      const { error: mealError } = await supabase
         .from('meals')
         .update({
           name,
@@ -133,8 +133,6 @@ export function EditMealDialog({ open, onOpenChange, meal, onMealUpdated }: Prop
         console.error('Error updating meal details:', mealError)
         throw mealError
       }
-
-      console.log('Updated meal:', updatedMeal)
 
       // Get current ingredients
       const { data: currentIngredients } = await supabase

@@ -12,8 +12,6 @@ function AcceptInviteContent() {
     const processInvite = async () => {
       const token = searchParams.get('token')
       const inviteId = searchParams.get('invite')
-      
-      console.log('Processing invite:', { token, inviteId }) // Debug log
 
       if (!token || !inviteId) {
         toast.error('Invalid invitation link')
@@ -29,25 +27,27 @@ function AcceptInviteContent() {
           return
         }
 
-        console.log('Current user:', user) // Debug log
-
         // Verify invitation exists and is pending
         const { data: invite, error: inviteError } = await supabase
           .from('group_invitations')
-          .select('email, status')
+          .select('email, status, expires_at')
           .eq('id', inviteId)
           .eq('group_id', token)
           .single()
 
-        console.log('Invitation data:', { invite, inviteError }) // Debug log
+        const normalizedInviteEmail = invite?.email?.trim().toLowerCase()
+        const normalizedUserEmail = user.email?.trim().toLowerCase()
+        const isExpired = invite?.expires_at ? new Date(invite.expires_at) <= new Date() : false
 
-        if (inviteError || !invite || invite.status !== 'pending' || invite.email !== user.email) {
-          console.log('Invitation validation failed:', { 
-            hasError: !!inviteError, 
-            exists: !!invite, 
-            status: invite?.status, 
-            emailMatch: invite?.email === user.email 
-          })
+        if (
+          inviteError
+          || !invite
+          || invite.status !== 'pending'
+          || !normalizedInviteEmail
+          || !normalizedUserEmail
+          || normalizedInviteEmail !== normalizedUserEmail
+          || isExpired
+        ) {
           toast.error('Invalid or expired invitation')
           router.push('/')
           return
@@ -63,7 +63,7 @@ function AcceptInviteContent() {
           })
 
         if (memberError) {
-          console.error('Error creating member:', memberError)
+          console.error('Failed to create group membership during invite acceptance')
           throw memberError
         }
 
@@ -75,11 +75,10 @@ function AcceptInviteContent() {
 
         toast.success('Successfully joined group')
         router.push('/groups')
-      } catch (error) {
-        console.error('Error accepting invitation:', error)
+      } catch {
+        console.error('Failed to process invitation')
         toast.error('Failed to process invitation')
         router.push('/')
-      } finally {
       }
     }
 

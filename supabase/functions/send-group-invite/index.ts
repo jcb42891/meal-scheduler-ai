@@ -9,8 +9,7 @@ export const handler = async (event: any) => {
   }
 
   try {
-    const { groupId, email } = JSON.parse(event.body)
-    console.log(`Invitation sent to ${email} for group ${groupId}`)
+    JSON.parse(event.body)
 
     return {
       statusCode: 200,

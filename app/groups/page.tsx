@@ -103,8 +103,6 @@ export default function GroupsPage() {
         throw groupError
       }
 
-      console.log('Group created:', groupData)
-
       // Now create the group membership
       const { error: memberError } = await supabase
         .from('group_members')
