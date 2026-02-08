@@ -22,6 +22,8 @@ type ParsedInput = {
   imageFile?: File
 }
 
+type RouteCookiesGetter = () => Promise<Awaited<ReturnType<typeof cookies>>>
+
 const parsedInputSchema = z.object({
   groupId: z.string().uuid(),
   sourceType: importSourceTypeSchema,
@@ -96,7 +98,11 @@ export async function POST(req: NextRequest) {
     const input = await parseRequestInput(req)
     const groupId = input.groupId
 
-    const supabase = createRouteHandlerClient({ cookies })
+    const cookieStore = await cookies()
+    const compatibleCookieGetter = (() => cookieStore) as unknown as RouteCookiesGetter
+    const supabase = createRouteHandlerClient({
+      cookies: compatibleCookieGetter,
+    })
     const {
       data: { session },
       error: sessionError,

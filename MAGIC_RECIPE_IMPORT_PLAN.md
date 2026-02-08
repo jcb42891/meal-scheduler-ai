@@ -20,7 +20,7 @@ Status values:
 | --- | --- | --- | --- | --- |
 | M0 | Planning + milestone definition | `Complete` | Codex | Plan doc exists with milestone tracker and acceptance criteria. |
 | M1 | Backend parse foundation | `Complete` | Codex | Parse API can accept `image/url/text`, authorize group membership, call LLM, and return validated normalized JSON. |
-| M2 | Meal Library UI integration | `Not started` | Codex | Users can parse content in a new dialog, review/edit fields, and save into `meals` + `meal_ingredients`. |
+| M2 | Meal Library UI integration | `Complete` | Codex | Users can parse content in a new dialog, review/edit fields, and save into `meals` + `meal_ingredients`. |
 | M3 | Hardening and safeguards | `Not started` | Codex | URL/file validation, timeout handling, parse error UX, and rate-limit strategy are implemented. |
 | M4 | QA + rollout readiness | `Not started` | Codex | Manual test matrix passes for all import types and key edge cases; env/config/docs are updated. |
 | M5 | Optional schema enhancement (V2) | `Not started` | Codex | Optional migration for structured recipe metadata is shipped and used by UI where needed. |
@@ -30,6 +30,8 @@ Status values:
 - 2026-02-08: Added explicit milestone statuses, owners, and exit criteria for ongoing tracking.
 - 2026-02-08: Started M1 implementation (backend parse foundation).
 - 2026-02-08: Completed M1 implementation with parse route, auth/group access checks, OpenAI integration, schema validation, normalization, and env updates.
+- 2026-02-08: Started M2 implementation (Meal Library UI integration).
+- 2026-02-08: Completed M2 implementation with `Magic Import` dialog, parse/review flow, and save-to-library wiring.
 
 ## Product Flow
 1. User opens `Meal Library`.
@@ -210,7 +212,7 @@ If provider/model config is needed:
   - Unauthorized users cannot parse for groups they do not belong to.
 
 ### M2: Meal Library UI Integration
-- Status: `Not started`
+- Status: `Complete`
 - Deliverables:
   - Add `Magic Import` button to `app/meals/page.tsx`.
   - Build `app/meals/magic-recipe-import-dialog.tsx`.

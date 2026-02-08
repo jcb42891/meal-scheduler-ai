@@ -53,6 +53,15 @@ const CATEGORY_ALIASES: Record<string, string> = {
 const FRACTION_PATTERN = /^(\d+)\s*\/\s*(\d+)$/
 const MIXED_PATTERN = /^(\d+)\s+(\d+)\s*\/\s*(\d+)$/
 
+function toTitleCase(value: string): string {
+  return value
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
 function parseQuantityValue(value: string | number | undefined): number | null {
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
     return value
@@ -126,7 +135,7 @@ export function normalizeParsedRecipe(recipe: ParsedRecipe): NormalizedRecipe {
 
   const normalizedIngredients = recipe.ingredients
     .map((ingredient) => {
-      const name = ingredient.name.trim()
+      const name = toTitleCase(ingredient.name.trim())
       if (!name) return null
 
       const quantity = parseQuantityValue(ingredient.quantity)

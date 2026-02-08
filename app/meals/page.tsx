@@ -23,6 +23,7 @@ import {
 import { Eye, Trash2, Pencil } from 'lucide-react'
 import { EditMealDialog } from './edit-meal-dialog'
 import { ViewMealDialog } from './view-meal-dialog'
+import { MagicRecipeImportDialog } from './magic-recipe-import-dialog'
 import { cn } from '@/lib/utils'
 import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from './meal-utils'
 import { MealFilterRack, WeeknightFilterOption } from '@/components/meal-filter-rack'
@@ -47,6 +48,7 @@ export default function MealsPage() {
   const [meals, setMeals] = useState<Meal[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showMagicImportDialog, setShowMagicImportDialog] = useState(false)
   const [userGroups, setUserGroups] = useState<{ id: string; name: string }[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState<string>('')
   const [mealToDelete, setMealToDelete] = useState<Meal | null>(null)
@@ -239,6 +241,14 @@ export default function MealsPage() {
             Create Meal
           </Button>
           <Button
+            onClick={() => setShowMagicImportDialog(true)}
+            variant="secondary"
+            className="w-full sm:w-auto"
+            disabled={!selectedGroupId}
+          >
+            Magic Import
+          </Button>
+          <Button
             onClick={handleGenerateOneOffList}
             className="w-full sm:w-auto"
             disabled={!selectedGroupId || selectedMealIds.size === 0}
@@ -385,6 +395,13 @@ export default function MealsPage() {
         onOpenChange={setShowCreateDialog}
         groupId={selectedGroupId}
         onMealCreated={fetchMeals}
+      />
+
+      <MagicRecipeImportDialog
+        open={showMagicImportDialog}
+        onOpenChange={setShowMagicImportDialog}
+        groupId={selectedGroupId}
+        onMealImported={fetchMeals}
       />
 
       <EditMealDialog
