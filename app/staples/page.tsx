@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { Chip } from '@/components/ui/chip'
-import { Card, CardHeader, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -21,9 +21,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Trash2, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { EditStapleDialog } from './edit-staple-dialog'
 import { PageHeader } from '@/components/page-header'
+import { cn } from '@/lib/utils'
+
+const STAPLES_PER_PAGE = 12
+const UNCATEGORIZED_FILTER_VALUE = 'uncategorized'
 
 type Group = {
   id: string
@@ -39,6 +43,11 @@ type StapleIngredient = {
   group_id: string
 }
 
+const normalizeCategory = (category: string | null) => {
+  const trimmedCategory = category?.trim()
+  return trimmedCategory && trimmedCategory.length > 0 ? trimmedCategory : null
+}
+
 export default function StaplesPage() {
   const { user } = useAuth()
   const router = useRouter()
@@ -52,6 +61,7 @@ export default function StaplesPage() {
   const [stapleToEdit, setStapleToEdit] = useState<StapleIngredient | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     if (!user) {
@@ -62,9 +72,17 @@ export default function StaplesPage() {
   }, [user, router])
 
   useEffect(() => {
-    if (!selectedGroupId) return
+    if (!selectedGroupId) {
+      setStaples([])
+      setLoading(false)
+      return
+    }
     fetchStaples()
   }, [selectedGroupId])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedGroupId, searchTerm, selectedCategory])
 
   const fetchUserGroups = async () => {
     const { data: { user: sessionUser } } = await supabase.auth.getUser()
@@ -95,12 +113,12 @@ export default function StaplesPage() {
 
     const allGroups = [
       ...ownedGroups,
-      ...memberGroups.map(m => ({
-        id: m.group.id,
-        name: m.group.name,
+      ...memberGroups.map((member) => ({
+        id: member.group.id,
+        name: member.group.name,
       })),
     ].filter((group, index, self) =>
-      index === self.findIndex((g) => g.id === group.id)
+      index === self.findIndex((item) => item.id === group.id)
     )
 
     setUserGroups(allGroups || [])
@@ -153,20 +171,75 @@ export default function StaplesPage() {
     }
   }
 
-  const categoryOptions = useMemo(() => {
-    const categories = staples
-      .map((staple) => staple.category)
-      .filter((category): category is string => Boolean(category))
-      .map((category) => category.trim())
-      .filter((category) => category.length > 0)
-    return ['all', ...Array.from(new Set(categories)).sort()]
-  }, [staples])
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase()
 
-  const filteredStaples = staples.filter((staple) => {
-    const matchesSearch = staple.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === 'all' || staple.category === selectedCategory
-    return matchesSearch && matchesCategory
+  const searchableStaples = staples.filter((staple) =>
+    staple.name.toLowerCase().includes(normalizedSearchTerm)
+  )
+
+  const categoryOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        searchableStaples
+          .map((staple) => normalizeCategory(staple.category))
+          .filter((category): category is string => Boolean(category))
+      )
+    ).sort((a, b) => a.localeCompare(b))
+  }, [searchableStaples])
+
+  const hasUncategorizedStaples = searchableStaples.some((staple) => !normalizeCategory(staple.category))
+
+  const categoryQuickFilters = [
+    { value: 'all', label: 'All staples', count: searchableStaples.length },
+    ...categoryOptions.map((category) => ({
+      value: category,
+      label: category,
+      count: searchableStaples.filter((staple) => normalizeCategory(staple.category) === category).length,
+    })),
+    ...(hasUncategorizedStaples || selectedCategory === UNCATEGORIZED_FILTER_VALUE
+      ? [{
+        value: UNCATEGORIZED_FILTER_VALUE,
+        label: 'Uncategorized',
+        count: searchableStaples.filter((staple) => !normalizeCategory(staple.category)).length,
+      }]
+      : []),
+  ]
+
+  const filteredStaples = searchableStaples.filter((staple) => {
+    if (selectedCategory === 'all') return true
+    if (selectedCategory === UNCATEGORIZED_FILTER_VALUE) {
+      return !normalizeCategory(staple.category)
+    }
+    return normalizeCategory(staple.category) === selectedCategory
   })
+
+  const totalPages = Math.max(1, Math.ceil(filteredStaples.length / STAPLES_PER_PAGE))
+
+  useEffect(() => {
+    setCurrentPage((prev) => Math.min(prev, totalPages))
+  }, [totalPages])
+
+  const startIndex = (currentPage - 1) * STAPLES_PER_PAGE
+  const paginatedStaples = filteredStaples.slice(startIndex, startIndex + STAPLES_PER_PAGE)
+  const showingStart = filteredStaples.length === 0 ? 0 : startIndex + 1
+  const showingEnd = Math.min(filteredStaples.length, startIndex + STAPLES_PER_PAGE)
+
+  const hasActiveFilters = normalizedSearchTerm.length > 0 || selectedCategory !== 'all'
+
+  const emptyStateMessage = hasActiveFilters
+    ? 'No staples match your current filters. Try widening your search or clearing a filter.'
+    : 'No staple ingredients have been added yet.'
+
+  const selectedCategoryLabel = selectedCategory === 'all'
+    ? 'all categories'
+    : selectedCategory === UNCATEGORIZED_FILTER_VALUE
+      ? 'uncategorized'
+      : selectedCategory
+
+  const handleClearFilters = () => {
+    setSearchTerm('')
+    setSelectedCategory('all')
+  }
 
   return (
     <div className="space-y-5">
@@ -182,7 +255,7 @@ export default function StaplesPage() {
           <select
             value={selectedGroupId}
             onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="h-10 w-full sm:w-[260px] rounded-md border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+            className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background sm:w-[260px]"
           >
             <option value="">Select a group</option>
             {userGroups.map((group) => (
@@ -195,87 +268,171 @@ export default function StaplesPage() {
       />
 
       <Card>
-        <CardHeader className="space-y-3 pb-4">
+        <CardHeader className="space-y-4 pb-4">
           <h2 className="text-lg font-semibold">Your Staples</h2>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+          <div className="space-y-2 rounded-2xl border border-border/70 bg-card/60 p-4 shadow-sm">
             <Input
-              placeholder="Search staples"
+              placeholder="Search staples..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="sm:max-w-xs"
             />
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="h-10 w-full sm:w-[220px] rounded-[10px] border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-            >
-              {categoryOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option === 'all' ? 'All categories' : option}
-                </option>
-              ))}
-            </select>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Quick Browse
+              </p>
+              {selectedCategory !== 'all' && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedCategory('all')}
+                  className="h-7 justify-start px-0 text-xs sm:h-8 sm:px-2"
+                >
+                  Clear category filter
+                </Button>
+              )}
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {categoryQuickFilters.map((filter) => {
+                const isActive = selectedCategory === filter.value
+                return (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => setSelectedCategory(filter.value)}
+                    className={cn(
+                      'inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                      isActive
+                        ? 'border-primary/60 bg-primary/10 text-primary'
+                        : 'border-border/70 bg-surface-2/60 text-foreground hover:bg-surface-2'
+                    )}
+                  >
+                    <span>{filter.label}</span>
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-0.5 text-[11px]',
+                        isActive ? 'bg-primary/15 text-primary' : 'bg-background text-muted-foreground'
+                      )}
+                    >
+                      {filter.count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+
+        <CardContent className="space-y-4">
           {loading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, index) => (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
                 <div
                   key={index}
-                  className="rounded-xl border border-border/60 bg-card p-3 shadow-sm"
+                  className="rounded-xl border border-border/60 bg-card p-4 shadow-sm"
                 >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-2 flex-1">
-                      <div className="h-4 w-40 rounded-full bg-surface-2 animate-pulse" />
-                      <div className="h-3 w-24 rounded-full bg-surface-2 animate-pulse" />
-                    </div>
-                    <div className="h-6 w-16 rounded-full bg-surface-2 animate-pulse" />
+                  <div className="space-y-3">
+                    <div className="h-4 w-40 animate-pulse rounded-full bg-surface-2" />
+                    <div className="h-3 w-24 animate-pulse rounded-full bg-surface-2" />
+                    <div className="h-9 w-28 animate-pulse rounded-md bg-surface-2" />
                   </div>
                 </div>
               ))}
-            </div>
-          ) : filteredStaples.length === 0 && selectedGroupId ? (
-            <div className="rounded-xl border border-border/60 bg-surface-2/70 p-6 text-center shadow-sm">
-              <p className="text-sm text-muted-foreground">
-                {searchTerm || selectedCategory !== 'all'
-                  ? 'No staples match your filters.'
-                  : 'No staple ingredients have been added yet.'}
-              </p>
-              {!searchTerm && selectedCategory === 'all' && (
-                <Button
-                  onClick={() => setShowCreateDialog(true)}
-                  className="mt-4"
-                >
-                  Add Staple
-                </Button>
-              )}
             </div>
           ) : !selectedGroupId ? (
             <div className="rounded-xl border border-border/60 bg-surface-2/70 p-6 text-center text-sm text-muted-foreground shadow-sm">
               Select a group to view staples.
             </div>
+          ) : filteredStaples.length === 0 ? (
+            <div className="rounded-xl border border-border/60 bg-surface-2/70 p-6 text-center shadow-sm">
+              <p className="text-sm text-muted-foreground">{emptyStateMessage}</p>
+              {hasActiveFilters ? (
+                <Button onClick={handleClearFilters} variant="outline" className="mt-4">
+                  Clear filters
+                </Button>
+              ) : (
+                <Button onClick={() => setShowCreateDialog(true)} className="mt-4">
+                  Add Staple
+                </Button>
+              )}
+            </div>
           ) : (
-            <div className="space-y-2">
-              {filteredStaples.map((staple) => (
-                <div
-                  key={staple.id}
-                  className="group rounded-xl border border-border/60 bg-card p-3 shadow-sm transition-colors hover:bg-surface-2/60 hover:shadow-md focus-within:shadow-md"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="space-y-1">
-                      <h3 className="text-base font-medium">{staple.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {staple.quantity} {staple.unit}
-                      </p>
-                    </div>
-                    <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
-                      {staple.category && (
-                        <Chip className="text-xs">
-                          {staple.category}
-                        </Chip>
-                      )}
-                      <div className="flex items-center gap-1 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+            <div className="space-y-3">
+              <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface-2/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Showing <span className="font-semibold text-foreground">{showingStart}-{showingEnd}</span> of{' '}
+                  <span className="font-semibold text-foreground">{filteredStaples.length}</span>{' '}
+                  staple{filteredStaples.length === 1 ? '' : 's'} in{' '}
+                  <span className="font-semibold text-foreground">{selectedCategoryLabel}</span>.
+                </p>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Prev
+                    </Button>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {paginatedStaples.map((staple) => {
+                  const category = normalizeCategory(staple.category)
+                  return (
+                    <article
+                      key={staple.id}
+                      className="group flex h-full flex-col justify-between rounded-xl border border-border/60 bg-card p-4 shadow-sm transition-all hover:bg-surface-2/60 hover:shadow-md focus-within:shadow-md"
+                    >
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <h3 className="text-base font-semibold leading-tight">{staple.name}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Stock target
+                          </p>
+                        </div>
+
+                        <div className="inline-flex w-fit rounded-lg border border-border/60 bg-surface-2/70 px-3 py-1.5">
+                          <p className="text-sm font-semibold text-foreground">
+                            {staple.quantity} {staple.unit}
+                          </p>
+                        </div>
+
+                        <div>
+                          {category ? (
+                            <Chip className="text-xs">
+                              {category}
+                            </Chip>
+                          ) : (
+                            <Chip className="text-xs text-muted-foreground">
+                              Uncategorized
+                            </Chip>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-end gap-1 border-t border-border/60 pt-3">
                         <IconButton
                           aria-label={`Edit ${staple.name}`}
                           onClick={() => setStapleToEdit(staple)}
@@ -290,10 +447,20 @@ export default function StaplesPage() {
                           <Trash2 className="h-4 w-4" />
                         </IconButton>
                       </div>
-                    </div>
+                    </article>
+                  )
+                })}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex justify-center">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
+                    <span>{currentPage}</span>
+                    <span>/</span>
+                    <span>{totalPages} pages</span>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           )}
         </CardContent>
