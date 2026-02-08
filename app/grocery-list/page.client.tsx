@@ -302,7 +302,7 @@ export function GroceryListClient() {
             <h2 className="text-lg font-semibold">{STEP_LABELS[step]}</h2>
             <p className="text-sm text-muted-foreground">
               {step === 0 && 'Review meal ingredients and uncheck anything you already have.'}
-              {step === 1 && 'Staple ingredients are pre-selected. Deselect anything you do not need.'}
+              {step === 1 && 'Select any staple ingredients that you need.'}
               {step === 2 && 'Your final list is ready to copy or download.'}
             </p>
           </CardHeader>
