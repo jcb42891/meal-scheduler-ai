@@ -114,31 +114,64 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user) {
+      toast.error('You must be signed in to send invitations')
+      return
+    }
+
+    const normalizedInviteEmail = inviteEmail.trim().toLowerCase()
+    if (!normalizedInviteEmail) {
+      toast.error('Enter an email address')
+      return
+    }
+
     setIsLoading(true)
 
     try {
-      // Check if user is already a member
-      const { data: existingMember } = await supabase
-        .from('group_members')
+      const { data: invitedProfile, error: invitedProfileError } = await supabase
+        .from('profiles')
         .select('id')
-        .eq('group_id', groupId)
-        .eq('user_id', user?.id)
-        .single()
+        .ilike('email', normalizedInviteEmail)
+        .limit(1)
+        .maybeSingle()
 
-      if (existingMember) {
-        toast.error('User is already a member of this group')
-        return
+      if (invitedProfileError) {
+        throw invitedProfileError
+      }
+
+      if (invitedProfile?.id) {
+        const { data: existingMember, error: existingMemberError } = await supabase
+          .from('group_members')
+          .select('user_id')
+          .eq('group_id', groupId)
+          .eq('user_id', invitedProfile.id)
+          .maybeSingle()
+
+        if (existingMemberError) {
+          throw existingMemberError
+        }
+
+        if (existingMember) {
+          toast.error('That user is already a member of this group')
+          return
+        }
       }
 
       // Check if invitation already exists
-      const { data: existingInvite } = await supabase
+      const { data: existingInvite, error: existingInviteError } = await supabase
         .from('group_invitations')
         .select('id, status')
         .eq('group_id', groupId)
-        .eq('email', inviteEmail)
-        .single()
+        .ilike('email', normalizedInviteEmail)
+        .eq('status', 'pending')
+        .limit(1)
+        .maybeSingle()
 
-      if (existingInvite && existingInvite.status === 'pending') {
+      if (existingInviteError) {
+        throw existingInviteError
+      }
+
+      if (existingInvite) {
         toast.error('An invitation is already pending for this email')
         return
       }
@@ -148,8 +181,8 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
         .from('group_invitations')
         .insert({
           group_id: groupId,
-          email: inviteEmail,
-          invited_by: user?.id,
+          email: normalizedInviteEmail,
+          invited_by: user.id,
           status: 'pending'
         })
 
@@ -158,8 +191,8 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
       toast.success('Invitation created successfully')
       setInviteEmail('')
       fetchInvitations()
-    } catch (error) {
-      console.error('Error creating invitation:', error)
+    } catch {
+      console.error('Failed to create invitation')
       toast.error('Failed to create invitation')
     } finally {
       setIsLoading(false)
@@ -176,8 +209,8 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
       
       await navigator.clipboard.writeText(shortUrl)
       toast.success('Invite link copied to clipboard')
-    } catch (error) {
-      console.error('Error creating short URL:', error)
+    } catch {
+      console.error('Invite link shortening failed')
       // Fallback to copying long URL
       await navigator.clipboard.writeText(longUrl)
       toast.success('Invite link copied to clipboard')

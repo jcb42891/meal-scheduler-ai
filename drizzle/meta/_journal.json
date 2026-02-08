@@ -22,6 +22,13 @@
       "when": 1769912474503,
       "tag": "0002_add_staple_ingredients",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1769947475000,
+      "tag": "0003_m1_security_data_access_hardening",
+      "breakpoints": true
     }
   ]
 }
