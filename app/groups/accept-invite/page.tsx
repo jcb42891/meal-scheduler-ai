@@ -5,80 +5,50 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 
+const DEFAULT_POST_ACCEPT_PATH = '/groups'
+
 function AcceptInviteContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+
   useEffect(() => {
     const processInvite = async () => {
       const token = searchParams.get('token')
-      const inviteId = searchParams.get('invite')
 
-      if (!token || !inviteId) {
+      if (!token) {
         toast.error('Invalid invitation link')
         router.push('/')
         return
       }
 
       try {
-        // Get current user
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
-          router.push('/auth')
+          const nextPath = `/groups/accept-invite?token=${encodeURIComponent(token)}`
+          router.replace(`/auth?next=${encodeURIComponent(nextPath)}`)
           return
         }
 
-        // Verify invitation exists and is pending
-        const { data: invite, error: inviteError } = await supabase
-          .from('group_invitations')
-          .select('email, status, expires_at')
-          .eq('id', inviteId)
-          .eq('group_id', token)
-          .single()
+        const response = await fetch('/api/groups/invitations/accept', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token }),
+        })
 
-        const normalizedInviteEmail = invite?.email?.trim().toLowerCase()
-        const normalizedUserEmail = user.email?.trim().toLowerCase()
-        const isExpired = invite?.expires_at ? new Date(invite.expires_at) <= new Date() : false
-
-        if (
-          inviteError
-          || !invite
-          || invite.status !== 'pending'
-          || !normalizedInviteEmail
-          || !normalizedUserEmail
-          || normalizedInviteEmail !== normalizedUserEmail
-          || isExpired
-        ) {
-          toast.error('Invalid or expired invitation')
-          router.push('/')
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          toast.error(payload?.error || 'Failed to process invitation')
+          router.replace('/groups')
           return
         }
-
-        // Accept invitation
-        const { error: memberError } = await supabase
-          .from('group_members')
-          .insert({
-            group_id: token,
-            user_id: user.id,
-            role: 'member'
-          })
-
-        if (memberError) {
-          console.error('Failed to create group membership during invite acceptance')
-          throw memberError
-        }
-
-        // Update invitation status
-        await supabase
-          .from('group_invitations')
-          .update({ status: 'accepted' })
-          .eq('id', inviteId)
 
         toast.success('Successfully joined group')
-        router.push('/groups')
+        router.replace(payload?.groupId ? `/groups/${payload.groupId}` : DEFAULT_POST_ACCEPT_PATH)
       } catch {
-        console.error('Failed to process invitation')
         toast.error('Failed to process invitation')
-        router.push('/')
+        router.replace('/groups')
       }
     }
 

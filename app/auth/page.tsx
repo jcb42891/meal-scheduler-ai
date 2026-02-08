@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -13,9 +13,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import Image from "next/image"
 import authBgImage from '@/public/auth-bg.jpg'
 
+const DEFAULT_SIGNED_IN_PATH = '/calendar'
+
+function getSafeNextPath(rawPath: string | null) {
+  if (rawPath && rawPath.startsWith('/') && !rawPath.startsWith('//') && !rawPath.startsWith('/api/')) {
+    return rawPath
+  }
+
+  return DEFAULT_SIGNED_IN_PATH
+}
 
 export default function AuthPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,22 +35,23 @@ export default function AuthPage() {
   const [resetEmail, setResetEmail] = useState('')
   const [isResetting, setIsResetting] = useState(false)
   const [activeTab, setActiveTab] = useState('signin')
+  const nextPath = getSafeNextPath(searchParams.get('next'))
 
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        router.replace('/calendar')
+        router.replace(nextPath)
       }
     }
     checkSession()
-  }, [router])
+  }, [nextPath, router])
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace('/calendar')
+      router.replace(nextPath)
     }
-  }, [authLoading, router, user])
+  }, [authLoading, nextPath, router, user])
 
   if (authLoading || user) {
     return <div className="min-h-[calc(100vh-4rem)]" />
@@ -104,7 +115,7 @@ export default function AuthPage() {
         return
       }
 
-      router.replace('/calendar')
+      router.replace(nextPath)
     } catch {
       console.error('Sign in failed')
       setError('An unexpected error occurred')

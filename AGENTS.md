@@ -32,14 +32,18 @@ Supabase touchpoints
 
 DB migrations (Drizzle + remote Supabase)
 - Migrations live in `drizzle/*.sql` and are tracked by `drizzle/meta/_journal.json`.
+- Required execution rule: whenever you add a new migration, run it against **staging** immediately (do not leave it unapplied locally-only).
+  - Preferred source of truth: `STAGING_DATABASE_URL` env var.
+  - Fallback (only if it points to staging): `DATABASE_URL` in `.env.local`.
 - Add a new migration:
   1) Create a new SQL file in `drizzle/` (next sequential tag, e.g. `0002_*.sql`).
   2) Add a matching entry in `drizzle/meta/_journal.json` with `idx` incremented and a `when` value greater than the previous entry.
-  3) Run `npm run db:migrate` with `DATABASE_URL` set to the remote Supabase Postgres connection string.
+  3) Run `npm run db:migrate` with `DATABASE_URL` set to the staging Supabase Postgres connection string.
+  4) Run `npm run db:introspect` against that same staging DB to verify migration state matches expectations.
 - Important: `0000_*` is an introspection baseline and must NOT be executed against the remote DB.
   - If migrations fail trying to run `0000_*`, mark it as applied in the remote DB by inserting into `drizzle.__drizzle_migrations`,
     then rerun `npm run db:migrate`.
-- Verification: confirm schema changes with a query like:
+- Verification: after introspection, confirm schema changes with a query like:
   - `select column_name from information_schema.columns where table_schema='public' and table_name='meals';`
 - GitHub Actions migration workflow:
   - Workflow: `.github/workflows/db-migrate.yml` (manual trigger only).

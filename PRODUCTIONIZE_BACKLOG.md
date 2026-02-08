@@ -1,7 +1,7 @@
 # Productionize + Monetization Backlog
 
 Created: February 8, 2026  
-Last Updated: February 8, 2026 (M1 complete)  
+Last Updated: February 8, 2026 (M2 complete)  
 Primary Goal: productionize Pantry Planner and ship a sustainable monetization model, starting with Magic Import.
 
 ## Status Legend
@@ -28,7 +28,7 @@ Primary Goal: productionize Pantry Planner and ship a sustainable monetization m
 | --- | --- | --- | --- | --- | --- |
 | M0 | Backlog governance and tracking setup | P0 | Complete | February 2026 | This backlog exists, with status rules, milestones, and progress log. |
 | M1 | Security and data access hardening | P0 | Complete | February 2026 | RLS/policy gaps are closed and validated with access tests. |
-| M2 | Auth, routing, and invite flow reliability | P0 | Not started | February 2026 | Protected routes are fully gated and invite flow is robust/reliable. |
+| M2 | Auth, routing, and invite flow reliability | P0 | Complete | February 2026 | Protected routes are fully gated and invite flow is robust/reliable. |
 | M3 | Durable usage metering and rate limiting | P0 | Not started | February to March 2026 | Import quotas and limits are persistent and enforceable across instances. |
 | M4 | Billing + entitlement system for Magic Import | P0 | Not started | March 2026 | Paid plans, webhooks, entitlements, and paywall are live end to end. |
 | M5 | Magic Import quality + margin optimization | P1 | Not started | March to April 2026 | URL deterministic parsing, model usage optimization, and parse quality metrics are in place. |
@@ -50,11 +50,11 @@ Primary Goal: productionize Pantry Planner and ship a sustainable monetization m
 ### M2: Auth, Routing, and Invite Flow Reliability
 | ID | Priority | Status | Item | Dependencies | Acceptance Criteria |
 | --- | --- | --- | --- | --- | --- |
-| APP-001 | P0 | Not started | Expand middleware protection to all authenticated app routes (`/meals`, `/staples`, `/profile`, relevant APIs). | None | Unauthenticated users cannot access protected routes directly. |
-| APP-002 | P0 | Not started | Replace current invite link logic with signed/expiring invite tokens; avoid plain `groupId`/`inviteId` query pairs. | SEC-002 | Invite links expire and cannot be forged/replayed. |
-| APP-003 | P0 | Not started | Replace TinyURL dependency in group invite flow with first-party link handling and optional server-side short links. | APP-002 | Invite links work without third-party URL shortener dependency. |
-| APP-004 | P0 | Not started | Fix invite/member validation bugs in `app/groups/[id]/client-component.tsx` (incorrect member checks and column usage). | SEC-001 | Invite creation behaves correctly for existing members and pending invites. |
-| APP-005 | P1 | Not started | Make invitation sending real (email provider integration for `supabase/functions/send-group-invite/index.ts`). | APP-002 | Invites are delivered via transactional email and tracked. |
+| APP-001 | P0 | Complete | Expand middleware protection to all authenticated app routes (`/meals`, `/staples`, `/profile`, relevant APIs). | None | Unauthenticated users cannot access protected routes directly. |
+| APP-002 | P0 | Complete | Replace current invite link logic with signed/expiring invite tokens; avoid plain `groupId`/`inviteId` query pairs. | SEC-002 | Invite links expire and cannot be forged/replayed. |
+| APP-003 | P0 | Complete | Replace TinyURL dependency in group invite flow with first-party link handling and optional server-side short links. | APP-002 | Invite links work without third-party URL shortener dependency. |
+| APP-004 | P0 | Complete | Fix invite/member validation bugs in `app/groups/[id]/client-component.tsx` (incorrect member checks and column usage). | SEC-001 | Invite creation behaves correctly for existing members and pending invites. |
+| APP-005 | P1 | Complete | Make invitation sending real (email provider integration for `supabase/functions/send-group-invite/index.ts`). | APP-002 | Invites are delivered via transactional email and tracked. |
 
 ### M3: Durable Usage Metering and Rate Limiting
 | ID | Priority | Status | Item | Dependencies | Acceptance Criteria |
@@ -136,3 +136,9 @@ Primary Goal: productionize Pantry Planner and ship a sustainable monetization m
 - 2026-02-08: SEC-003 moved to `Complete` after removing sensitive auth/invite debug logging in client and invite function paths.
 - 2026-02-08: SEC-004 moved to `Complete` after adding `scripts/test-m1-security.mjs` and `npm run test:security:m1` to validate unauthorized mutation failures.
 - 2026-02-08: M1 moved to `Complete` after validating policy/constraint hardening and automated access tests.
+- 2026-02-08: APP-001 moved to `Complete` after expanding `middleware.ts` route/API matchers and auth redirects for `/meals`, `/staples`, `/profile`, and invite/import APIs.
+- 2026-02-08: APP-002 moved to `Complete` after adding signed, expiring invite tokens and server-side token verification in `app/api/groups/invitations/*`.
+- 2026-02-08: APP-003 moved to `Complete` after removing TinyURL usage and switching invite-link generation to first-party API routes.
+- 2026-02-08: APP-004 moved to `Complete` after moving invite/member validation into server routes and fixing member relation usage in `app/groups/[id]/client-component.tsx`.
+- 2026-02-08: APP-005 moved to `Complete` after implementing transactional invite email delivery in `supabase/functions/send-group-invite/index.ts` and tracking delivery metadata on invitations.
+- 2026-02-08: M2 moved to `Complete` after validating protected route behavior, invite-link signing/expiry, first-party invite sharing, and TypeScript/lint checks.
