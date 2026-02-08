@@ -201,7 +201,7 @@ export function GroceryListClient() {
           category: staple.category,
         }))
         setStapleItems(items)
-        setSelectedStapleKeys(new Set(items.map((item) => item.key)))
+        setSelectedStapleKeys(new Set())
       } catch (error) {
         console.error('Error fetching staple ingredients:', error)
         toast.error('Failed to load staple ingredients')
