@@ -56,6 +56,7 @@ export default function MealsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [weeknightFilter, setWeeknightFilter] = useState<'all' | 'friendly' | 'not-friendly'>('all')
+  const [selectedMealIds, setSelectedMealIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!user) {
@@ -130,6 +131,19 @@ export default function MealsPage() {
     setLoading(false)
   }
 
+  useEffect(() => {
+    setSelectedMealIds(new Set())
+  }, [selectedGroupId])
+
+  useEffect(() => {
+    setSelectedMealIds((prev) => {
+      if (prev.size === 0) return prev
+      const validIds = new Set(meals.map((meal) => meal.id))
+      const next = new Set(Array.from(prev).filter((id) => validIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [meals])
+
   const handleDeleteMeal = async () => {
     if (!mealToDelete) return
     
@@ -162,6 +176,45 @@ export default function MealsPage() {
     return matchesSearch && matchesCategory && matchesWeeknight
   })
 
+  const handleToggleMealSelection = (mealId: string) => {
+    setSelectedMealIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(mealId)) {
+        next.delete(mealId)
+      } else {
+        next.add(mealId)
+      }
+      return next
+    })
+  }
+
+  const handleGenerateOneOffList = () => {
+    if (!selectedGroupId) {
+      toast.error('Select a group first')
+      return
+    }
+    if (selectedMealIds.size === 0) {
+      toast.error('Select at least one meal')
+      return
+    }
+
+    const params = new URLSearchParams({
+      source: 'meals',
+      groupId: selectedGroupId,
+      mealIds: Array.from(selectedMealIds).join(','),
+    })
+    const url = `/grocery-list?${params.toString()}`
+    const nextWindow = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!nextWindow) {
+      toast.error('Pop-up blocked. Please allow pop-ups for this site.')
+      return
+    }
+    try {
+      nextWindow.focus()
+    } catch {
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -184,6 +237,13 @@ export default function MealsPage() {
           </select>
           <Button onClick={() => setShowCreateDialog(true)} className="w-full sm:w-auto">
             Create Meal
+          </Button>
+          <Button
+            onClick={handleGenerateOneOffList}
+            className="w-full sm:w-auto"
+            disabled={!selectedGroupId || selectedMealIds.size === 0}
+          >
+            Build Grocery List ({selectedMealIds.size})
           </Button>
         </div>
       </div>
@@ -262,13 +322,22 @@ export default function MealsPage() {
                   className="group rounded-xl border border-border/60 bg-card p-3 shadow-sm transition-colors hover:bg-surface-2/60 hover:shadow-md focus-within:shadow-md"
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="space-y-1">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedMealIds.has(meal.id)}
+                        onChange={() => handleToggleMealSelection(meal.id)}
+                        className="mt-1 h-4 w-4 accent-primary"
+                        aria-label={`Select ${meal.name} for grocery list`}
+                      />
+                      <div className="space-y-1">
                       <h3 className="text-base font-medium">{meal.name}</h3>
                       {meal.description && (
                         <p className="text-sm text-muted-foreground sm:max-w-md truncate">
                           {meal.description}
                         </p>
                       )}
+                      </div>
                     </div>
                     <div className="flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end">
                       {meal.category && (

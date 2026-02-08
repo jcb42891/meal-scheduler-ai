@@ -32,6 +32,7 @@ export const config = {
   matcher: [
     '/auth/update-password',
     '/groups/:path*',
-    '/calendar/:path*'
+    '/calendar/:path*',
+    '/grocery-list/:path*'
   ]
 } 

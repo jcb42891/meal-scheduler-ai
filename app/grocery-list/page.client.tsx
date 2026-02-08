@@ -34,6 +34,10 @@ type MealCalendarEntry = {
   } | null
 }
 
+type MealIngredientEntry = {
+  meal_ingredients: MealIngredient[]
+}
+
 type StapleIngredient = {
   id: string
   name: string
@@ -58,57 +62,113 @@ export function GroceryListClient() {
   const [loadingMeals, setLoadingMeals] = useState(true)
   const [loadingStaples, setLoadingStaples] = useState(true)
 
+  const source = searchParams.get('source') === 'meals' ? 'meals' : 'calendar'
   const groupId = searchParams.get('groupId') || ''
   const start = searchParams.get('start') || ''
   const end = searchParams.get('end') || ''
+  const mealIdsParam = searchParams.get('mealIds') || ''
+  const mealIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          mealIdsParam
+            .split(',')
+            .map((id) => id.trim())
+            .filter(Boolean),
+        ),
+      ),
+    [mealIdsParam],
+  )
+
+  const listContextLabel =
+    source === 'calendar'
+      ? `${start} to ${end}`
+      : `${mealIds.length} selected meal${mealIds.length === 1 ? '' : 's'}`
 
   useEffect(() => {
-    if (!groupId || !start || !end) {
+    const hasValidCalendarParams = source === 'calendar' && !!start && !!end
+    const hasValidMealParams = source === 'meals' && mealIds.length > 0
+    if (!groupId || (!hasValidCalendarParams && !hasValidMealParams)) {
       toast.error('Missing grocery list details.')
-      router.replace('/calendar')
+      router.replace(source === 'meals' ? '/meals' : '/calendar')
     }
-  }, [groupId, start, end, router])
+  }, [groupId, source, start, end, mealIds.length, router])
 
   useEffect(() => {
-    if (!groupId || !start || !end) return
+    if (!groupId) return
+    if (source === 'calendar' && (!start || !end)) return
+    if (source === 'meals' && mealIds.length === 0) return
 
     const fetchMealIngredients = async () => {
       setLoadingMeals(true)
       try {
-        const { data, error } = await supabase
-          .from('meal_calendar')
-          .select(`
-            meal:meals(
+        const totals: Record<string, IngredientTotal> = {}
+
+        if (source === 'calendar') {
+          const { data, error } = await supabase
+            .from('meal_calendar')
+            .select(`
+              meal:meals(
+                meal_ingredients(
+                  quantity,
+                  unit,
+                  ingredient:ingredients(name)
+                )
+              )
+            `)
+            .eq('group_id', groupId)
+            .gte('date', start)
+            .lte('date', end)
+            .returns<MealCalendarEntry[]>()
+
+          if (error) throw error
+
+          data.forEach((entry) => {
+            if (!entry.meal) return
+            entry.meal.meal_ingredients.forEach((mi) => {
+              const key = makeKey(mi.ingredient.name, mi.unit)
+              if (!totals[key]) {
+                totals[key] = {
+                  key,
+                  name: mi.ingredient.name,
+                  total: 0,
+                  unit: mi.unit,
+                }
+              }
+              totals[key].total += mi.quantity
+            })
+          })
+        } else {
+          const { data, error } = await supabase
+            .from('meals')
+            .select(`
               meal_ingredients(
                 quantity,
                 unit,
                 ingredient:ingredients(name)
               )
-            )
-          `)
-          .eq('group_id', groupId)
-          .gte('date', start)
-          .lte('date', end)
-          .returns<MealCalendarEntry[]>()
+            `)
+            .eq('group_id', groupId)
+            .in('id', mealIds)
+            .returns<MealIngredientEntry[]>()
 
-        if (error) throw error
+          if (error) throw error
 
-        const totals: Record<string, IngredientTotal> = {}
-        data.forEach((entry) => {
-          if (!entry.meal) return
-          entry.meal.meal_ingredients.forEach((mi) => {
-            const key = makeKey(mi.ingredient.name, mi.unit)
-            if (!totals[key]) {
-              totals[key] = {
-                key,
-                name: mi.ingredient.name,
-                total: 0,
-                unit: mi.unit,
+          data.forEach((meal) => {
+            meal.meal_ingredients.forEach((mi) => {
+              const key = makeKey(mi.ingredient.name, mi.unit)
+              if (!totals[key]) {
+                totals[key] = {
+                  key,
+                  name: mi.ingredient.name,
+                  total: 0,
+                  unit: mi.unit,
+                }
               }
-            }
-            totals[key].total += mi.quantity
+              totals[key].total += mi.quantity
+            })
           })
-        })
+        }
 
         const items = Object.values(totals).sort((a, b) => a.name.localeCompare(b.name))
         setMealItems(items)
@@ -152,7 +212,7 @@ export function GroceryListClient() {
 
     fetchMealIngredients()
     fetchStapleIngredients()
-  }, [groupId, start, end])
+  }, [groupId, source, start, end, mealIds, mealIdsParam])
 
   const combinedItems = useMemo(() => {
     const combined: Record<string, IngredientTotal> = {}
@@ -218,9 +278,7 @@ export function GroceryListClient() {
               <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Grocery list builder</p>
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Finalize your list</h1>
             </div>
-            <Chip className="text-xs">
-              {start} → {end}
-            </Chip>
+            <Chip className="text-xs">{listContextLabel}</Chip>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -254,7 +312,11 @@ export function GroceryListClient() {
                 {loadingMeals ? (
                   <p className="text-sm text-muted-foreground">Loading meal ingredients...</p>
                 ) : mealItems.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No meal ingredients were found for this range.</p>
+                  <p className="text-sm text-muted-foreground">
+                    {source === 'calendar'
+                      ? 'No meal ingredients were found for this range.'
+                      : 'No meal ingredients were found for the selected meals.'}
+                  </p>
                 ) : (
                   <div className="space-y-2">
                     {mealItems.map((item) => (
@@ -302,9 +364,7 @@ export function GroceryListClient() {
                             className="h-4 w-4 accent-primary"
                           />
                           <span className="text-sm font-medium">{item.name}</span>
-                          {item.category && (
-                            <Chip className="text-xs">{item.category}</Chip>
-                          )}
+                          {item.category && <Chip className="text-xs">{item.category}</Chip>}
                         </div>
                         <span className="inline-flex min-w-9 items-center justify-center rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
                           {item.total}
