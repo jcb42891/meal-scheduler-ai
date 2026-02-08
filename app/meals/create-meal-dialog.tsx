@@ -120,7 +120,7 @@ export function CreateMealDialog({ open, onOpenChange, groupId, onMealCreated }:
           <DialogTitle>Create New Meal</DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 overflow-y-auto pr-2">
+        <div className="flex-1 overflow-y-auto pl-1 pr-2">
           <form id="create-meal-form" onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
