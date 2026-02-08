@@ -159,8 +159,7 @@ export async function POST(req: NextRequest) {
         sourceUrl,
       })
     } catch (error) {
-      const fallbackParsedRecipe =
-        input.sourceType === 'image' ? null : parseRecipeFromPlainTextFallback(sourceText)
+      const fallbackParsedRecipe = input.sourceType === 'text' ? parseRecipeFromPlainTextFallback(sourceText) : null
 
       if (!fallbackParsedRecipe) {
         throw error

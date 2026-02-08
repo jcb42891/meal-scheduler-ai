@@ -1,12 +1,10 @@
 const MAX_HTML_CHARS = 1_200_000
-const MAX_EXTRACTED_TEXT_CHARS = 24_000
+const MAX_LLM_HTML_CHARS = 60_000
 const REQUEST_TIMEOUT_MS = 10_000
 
 const SCRIPT_TAG_PATTERN = /<script([^>]*)>([\s\S]*?)<\/script>/gi
-const STRIP_SCRIPT_STYLE_PATTERN = /<(script|style)[^>]*>[\s\S]*?<\/\1>/gi
-const STRIP_TAGS_PATTERN = /<\/?[^>]+(>|$)/g
-const MULTISPACE_PATTERN = /\s+/g
 const HTML_ENTITY_PATTERN = /&(?:amp|lt|gt|quot|#39|apos);/g
+
 const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
@@ -40,28 +38,45 @@ function isLikelyPrivateHost(hostname: string): boolean {
   return false
 }
 
+function decodeHtmlEntities(value: string): string {
+  return value.replace(HTML_ENTITY_PATTERN, (entity) => {
+    switch (entity) {
+      case '&amp;':
+        return '&'
+      case '&lt;':
+        return '<'
+      case '&gt;':
+        return '>'
+      case '&quot;':
+        return '"'
+      case '&#39;':
+      case '&apos;':
+        return "'"
+      default:
+        return entity
+    }
+  })
+}
+
 function flattenRecipeCandidate(value: unknown): Record<string, unknown>[] {
   if (!value) return []
-  if (Array.isArray(value)) {
-    return value.flatMap(flattenRecipeCandidate)
-  }
-  if (typeof value !== 'object') {
-    return []
-  }
+  if (Array.isArray(value)) return value.flatMap(flattenRecipeCandidate)
+  if (typeof value !== 'object') return []
 
   const record = value as Record<string, unknown>
   const graph = record['@graph']
-  const nested = flattenRecipeCandidate(graph)
-  return [record, ...nested]
+  return [record, ...flattenRecipeCandidate(graph)]
 }
 
 function includesRecipeType(typeValue: unknown): boolean {
   if (typeof typeValue === 'string') {
     return typeValue.toLowerCase().includes('recipe')
   }
+
   if (Array.isArray(typeValue)) {
     return typeValue.some((entry) => typeof entry === 'string' && entry.toLowerCase().includes('recipe'))
   }
+
   return false
 }
 
@@ -86,34 +101,6 @@ function toInstructionLines(raw: unknown): string[] {
   }
 
   return []
-}
-
-function stripHtmlToText(html: string): string {
-  return html
-    .replace(STRIP_SCRIPT_STYLE_PATTERN, ' ')
-    .replace(STRIP_TAGS_PATTERN, ' ')
-    .replace(MULTISPACE_PATTERN, ' ')
-    .trim()
-}
-
-function decodeHtmlEntities(value: string): string {
-  return value.replace(HTML_ENTITY_PATTERN, (entity) => {
-    switch (entity) {
-      case '&amp;':
-        return '&'
-      case '&lt;':
-        return '<'
-      case '&gt;':
-        return '>'
-      case '&quot;':
-        return '"'
-      case '&#39;':
-      case '&apos;':
-        return "'"
-      default:
-        return entity
-    }
-  })
 }
 
 function extractRecipeTextFromParsedJson(value: unknown): string | null {
@@ -143,7 +130,9 @@ function extractRecipeTextFromJsonLd(html: string): string | null {
 
   for (const match of scriptMatches) {
     const attributes = match[1] ?? ''
-    const scriptBody = match[2] ?? ''
+    const scriptBody = match[2]?.trim() ?? ''
+    if (!scriptBody) continue
+
     const typeMatch = attributes.match(/\btype\s*=\s*["']?([^"'\s>]+)["']?/i)
     const scriptType = typeMatch?.[1]?.toLowerCase() ?? ''
     const isJsonLdScript = scriptType === 'application/ld+json'
@@ -153,20 +142,16 @@ function extractRecipeTextFromJsonLd(html: string): string | null {
       continue
     }
 
-    const rawJson = scriptBody.trim()
-    if (!rawJson) continue
-
     try {
-      const parsed = JSON.parse(rawJson) as unknown
+      const parsed = JSON.parse(scriptBody) as unknown
       const extracted = extractRecipeTextFromParsedJson(parsed)
       if (extracted) return extracted
     } catch {
-      const decodedJson = decodeHtmlEntities(rawJson)
-      if (decodedJson === rawJson) continue
-
+      const decoded = decodeHtmlEntities(scriptBody)
+      if (decoded === scriptBody) continue
       try {
-        const parsedDecoded = JSON.parse(decodedJson) as unknown
-        const extracted = extractRecipeTextFromParsedJson(parsedDecoded)
+        const parsed = JSON.parse(decoded) as unknown
+        const extracted = extractRecipeTextFromParsedJson(parsed)
         if (extracted) return extracted
       } catch {
         continue
@@ -177,10 +162,26 @@ function extractRecipeTextFromJsonLd(html: string): string | null {
   return null
 }
 
-function limitExtractedText(text: string, warnings: string[]): string {
-  if (text.length <= MAX_EXTRACTED_TEXT_CHARS) return text
-  warnings.push('Extracted recipe text was truncated to keep AI parsing reliable.')
-  return text.slice(0, MAX_EXTRACTED_TEXT_CHARS)
+function buildLlmHtmlPayload(url: string, html: string, warnings: string[]): string {
+  const trimmed = html.trim()
+  if (!trimmed) {
+    throw new Error('Fetched recipe page did not contain readable HTML.')
+  }
+
+  let payloadHtml = trimmed
+  if (payloadHtml.length > MAX_LLM_HTML_CHARS) {
+    payloadHtml = payloadHtml.slice(0, MAX_LLM_HTML_CHARS)
+    warnings.push('Raw HTML was truncated before AI parsing to stay within model context limits.')
+  }
+
+  return [
+    `Recipe URL: ${url}`,
+    'The following is raw HTML from the recipe page. Extract only the main recipe title, ingredients, and instructions.',
+    'Prioritize JSON-LD recipe metadata if present. Ignore reviews, comments, nav, and recommendation carousels.',
+    'RAW_HTML_START',
+    payloadHtml,
+    'RAW_HTML_END',
+  ].join('\n')
 }
 
 export function validateImportUrl(inputUrl: string): URL {
@@ -242,29 +243,24 @@ export async function fetchRecipeTextFromUrl(inputUrl: string): Promise<UrlExtra
       throw new Error(`Failed to fetch recipe URL (status ${response?.status ?? 'unknown'}).`)
     }
 
-    const contentType = response.headers.get('content-type') || ''
+    const contentType = response.headers.get('content-type')?.toLowerCase() || ''
     if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
-      warnings.push('Fetched URL was not marked as HTML; extraction quality may be limited.')
+      warnings.push('Fetched URL was not marked as HTML. AI parsing may be less reliable.')
     }
 
     let html = await response.text()
     if (html.length > MAX_HTML_CHARS) {
       html = html.slice(0, MAX_HTML_CHARS)
-      warnings.push('Recipe page was truncated to keep extraction bounded.')
+      warnings.push('Recipe page response was truncated before processing.')
     }
 
-    const jsonLdRecipeText = extractRecipeTextFromJsonLd(html)
-    if (jsonLdRecipeText) {
-      return { text: limitExtractedText(jsonLdRecipeText, warnings), warnings }
+    const extractedRecipeText = extractRecipeTextFromJsonLd(html)
+    if (extractedRecipeText) {
+      return { text: extractedRecipeText, warnings }
     }
 
-    warnings.push('Structured recipe metadata was not found. Fell back to plain-text page extraction.')
-    const fallbackText = stripHtmlToText(html)
-    if (!fallbackText) {
-      throw new Error('Unable to extract readable text from the recipe URL.')
-    }
-
-    return { text: limitExtractedText(fallbackText, warnings), warnings }
+    warnings.push('Structured recipe metadata was not found. Falling back to raw HTML parsing.')
+    return { text: buildLlmHtmlPayload(parsedUrl.toString(), html, warnings), warnings }
   } finally {
     clearTimeout(timeout)
   }

@@ -1,24 +1,24 @@
 import type { ParsedRecipe } from './types'
 
 const FRACTION_CHARS: Record<string, string> = {
-  '¼': '1/4',
-  '½': '1/2',
-  '¾': '3/4',
-  '⅐': '1/7',
-  '⅑': '1/9',
-  '⅒': '1/10',
-  '⅓': '1/3',
-  '⅔': '2/3',
-  '⅕': '1/5',
-  '⅖': '2/5',
-  '⅗': '3/5',
-  '⅘': '4/5',
-  '⅙': '1/6',
-  '⅚': '5/6',
-  '⅛': '1/8',
-  '⅜': '3/8',
-  '⅝': '5/8',
-  '⅞': '7/8',
+  '\u00bc': '1/4',
+  '\u00bd': '1/2',
+  '\u00be': '3/4',
+  '\u2150': '1/7',
+  '\u2151': '1/9',
+  '\u2152': '1/10',
+  '\u2153': '1/3',
+  '\u2154': '2/3',
+  '\u2155': '1/5',
+  '\u2156': '2/5',
+  '\u2157': '3/5',
+  '\u2158': '4/5',
+  '\u2159': '1/6',
+  '\u215a': '5/6',
+  '\u215b': '1/8',
+  '\u215c': '3/8',
+  '\u215d': '5/8',
+  '\u215e': '7/8',
 }
 
 const UNIT_ALIASES: Record<string, string> = {
@@ -100,6 +100,7 @@ function inferRecipeName(sourceText: string): string {
     if (line.length > 120) return false
     if (/^\d/.test(line)) return false
     if (/^yield\s*:?/i.test(line)) return false
+    if (/^recipe url\s*:/i.test(line)) return false
     return /recipe|stew|soup|salad|pasta|chicken|beef|pork|fish/i.test(line)
   })
   if (explicitTitle) return explicitTitle.slice(0, 120)
