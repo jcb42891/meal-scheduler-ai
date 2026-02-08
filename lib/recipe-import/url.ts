@@ -16,11 +16,22 @@ type UrlExtractionResult = {
 function isLikelyPrivateHost(hostname: string): boolean {
   const host = hostname.toLowerCase()
 
-  if (host === 'localhost' || host.endsWith('.local') || host === '::1') {
+  if (
+    host === 'localhost' ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host === '::1' ||
+    host === '0:0:0:0:0:0:0:1'
+  ) {
     return true
   }
 
-  if (host.startsWith('127.') || host.startsWith('10.')) {
+  if (
+    host.startsWith('127.') ||
+    host.startsWith('10.') ||
+    host.startsWith('169.254.') ||
+    host.startsWith('192.0.0.')
+  ) {
     return true
   }
 
@@ -33,6 +44,17 @@ function isLikelyPrivateHost(hostname: string): boolean {
     if (Number.isFinite(secondOctet) && secondOctet >= 16 && secondOctet <= 31) {
       return true
     }
+  }
+
+  if (host.startsWith('100.')) {
+    const secondOctet = Number(host.split('.')[1] ?? '')
+    if (Number.isFinite(secondOctet) && secondOctet >= 64 && secondOctet <= 127) {
+      return true
+    }
+  }
+
+  if (host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) {
+    return true
   }
 
   return false
@@ -261,6 +283,15 @@ export async function fetchRecipeTextFromUrl(inputUrl: string): Promise<UrlExtra
 
     warnings.push('Structured recipe metadata was not found. Falling back to raw HTML parsing.')
     return { text: buildLlmHtmlPayload(parsedUrl.toString(), html, warnings), warnings }
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Fetching recipe URL timed out after 10 seconds. Try another source or paste text directly.')
+      }
+      throw error
+    }
+
+    throw new Error('Failed to fetch recipe URL.')
   } finally {
     clearTimeout(timeout)
   }

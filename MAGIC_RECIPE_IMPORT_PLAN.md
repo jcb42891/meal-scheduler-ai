@@ -21,7 +21,7 @@ Status values:
 | M0 | Planning + milestone definition | `Complete` | Codex | Plan doc exists with milestone tracker and acceptance criteria. |
 | M1 | Backend parse foundation | `Complete` | Codex | Parse API can accept `image/url/text`, authorize group membership, call LLM, and return validated normalized JSON. |
 | M2 | Meal Library UI integration | `Complete` | Codex | Users can parse content in a new dialog, review/edit fields, and save into `meals` + `meal_ingredients`. |
-| M3 | Hardening and safeguards | `Not started` | Codex | URL/file validation, timeout handling, parse error UX, and rate-limit strategy are implemented. |
+| M3 | Hardening and safeguards | `Complete` | Codex | URL/file validation, timeout handling, parse error UX, and rate-limit strategy are implemented. |
 | M4 | QA + rollout readiness | `Not started` | Codex | Manual test matrix passes for all import types and key edge cases; env/config/docs are updated. |
 | M5 | Optional schema enhancement (V2) | `Not started` | Codex | Optional migration for structured recipe metadata is shipped and used by UI where needed. |
 
@@ -32,6 +32,7 @@ Status values:
 - 2026-02-08: Completed M1 implementation with parse route, auth/group access checks, OpenAI integration, schema validation, normalization, and env updates.
 - 2026-02-08: Started M2 implementation (Meal Library UI integration).
 - 2026-02-08: Completed M2 implementation with `Magic Import` dialog, parse/review flow, and save-to-library wiring.
+- 2026-02-08: Completed M3 implementation with URL/image hardening, parse/fetch timeout handling, route rate-limiting, and improved disclosure/error UX.
 
 ## Product Flow
 1. User opens `Meal Library`.
@@ -172,6 +173,10 @@ Add to `.env.example` (no secrets committed):
 If provider/model config is needed:
 - `RECIPE_IMPORT_MODEL=` (optional override)
 
+Optional hardening overrides (defaults apply when unset):
+- `RECIPE_IMPORT_RATE_LIMIT_MAX_REQUESTS=` (default `8`)
+- `RECIPE_IMPORT_RATE_LIMIT_WINDOW_SECONDS=` (default `300`)
+
 ## Testing and Validation Plan
 1. **Manual UI validation**
    - Screenshot parse with clean text and noisy text.
@@ -223,7 +228,7 @@ If provider/model config is needed:
   - Imported meal appears in meal list immediately after save.
 
 ### M3: Hardening and Safeguards
-- Status: `Not started`
+- Status: `Complete`
 - Deliverables:
   - URL protocol and host safety checks.
   - File type/size validation for image uploads.

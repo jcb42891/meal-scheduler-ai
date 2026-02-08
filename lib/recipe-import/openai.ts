@@ -4,6 +4,7 @@ import { parsedRecipeSchema } from './schema'
 import type { ImportSourceType, ParsedRecipe } from './types'
 
 const DEFAULT_MODEL = process.env.RECIPE_IMPORT_MODEL || 'gpt-4.1-mini'
+const OPENAI_TIMEOUT_MS = 20_000
 
 type ParseRecipeInput = {
   sourceType: ImportSourceType
@@ -20,7 +21,7 @@ function getClient(): OpenAI {
     throw new Error('OPENAI_API_KEY is not configured.')
   }
 
-  return new OpenAI({ apiKey })
+  return new OpenAI({ apiKey, timeout: OPENAI_TIMEOUT_MS, maxRetries: 1 })
 }
 
 function buildSystemPrompt() {

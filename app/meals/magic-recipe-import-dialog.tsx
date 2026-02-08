@@ -45,7 +45,14 @@ type ParseResponse = {
     warnings: string[]
     confidence: number | null
   }
+  source?: {
+    sourceType: 'image' | 'url' | 'text'
+    url?: string | null
+  }
 }
+
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
 const ALLOWED_UNITS = [
   { value: 'unit', label: 'unit' },
@@ -67,7 +74,7 @@ const PARSE_LOADING_MESSAGES = [
   'Untangling steps, one noodle at a time...',
   'Converting kitchen chaos into dinner plans...',
   'Sprinkling a little parser pixie dust...',
-  'Finding the “pinch of salt” in all that text...',
+  'Finding the "pinch of salt" in all that text...',
   'Preheating the import engine...',
 ]
 
@@ -109,6 +116,8 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
   const [parseLoadingMessage, setParseLoadingMessage] = useState(PARSE_LOADING_MESSAGES[0])
   const [isParsing, setIsParsing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [parseWarnings, setParseWarnings] = useState<string[]>([])
+  const [parseConfidence, setParseConfidence] = useState<number | null>(null)
 
   const [mealName, setMealName] = useState('')
   const [description, setDescription] = useState('')
@@ -154,7 +163,59 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
     setWeeknightFriendly(false)
     setEditableIngredients([])
     setIngredientSearchTerm('')
+    setParseWarnings([])
+    setParseConfidence(null)
   }, [open])
+
+  const parseConfidencePercent = useMemo(() => {
+    if (parseConfidence === null || !Number.isFinite(parseConfidence)) return null
+    return Math.round(parseConfidence * 100)
+  }, [parseConfidence])
+
+  const validateSourceInput = () => {
+    if (sourceType === 'url') {
+      const trimmedUrl = sourceUrl.trim()
+      if (!trimmedUrl) {
+        toast.error('Enter a recipe URL')
+        return false
+      }
+
+      try {
+        const parsed = new URL(trimmedUrl)
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          toast.error('Only http/https URLs are supported')
+          return false
+        }
+      } catch {
+        toast.error('Enter a valid recipe URL')
+        return false
+      }
+    }
+
+    if (sourceType === 'text' && !sourceText.trim()) {
+      toast.error('Paste recipe text to parse')
+      return false
+    }
+
+    if (sourceType === 'image') {
+      if (!sourceImage) {
+        toast.error('Upload an image to parse')
+        return false
+      }
+
+      if (!ALLOWED_IMAGE_TYPES.has(sourceImage.type)) {
+        toast.error('Only PNG, JPEG, and WEBP images are supported')
+        return false
+      }
+
+      if (sourceImage.size > MAX_IMAGE_BYTES) {
+        toast.error('Image file exceeds the 8MB upload limit')
+        return false
+      }
+    }
+
+    return true
+  }
 
   const handleParse = async () => {
     if (!groupId) {
@@ -162,16 +223,7 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
       return
     }
 
-    if (sourceType === 'url' && !sourceUrl.trim()) {
-      toast.error('Enter a recipe URL')
-      return
-    }
-    if (sourceType === 'text' && !sourceText.trim()) {
-      toast.error('Paste recipe text to parse')
-      return
-    }
-    if (sourceType === 'image' && !sourceImage) {
-      toast.error('Upload an image to parse')
+    if (!validateSourceInput()) {
       return
     }
 
@@ -191,7 +243,12 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
       })
       const payload = await response.json()
       if (!response.ok) {
-        throw new Error(payload?.error || 'Failed to parse recipe')
+        const details = Array.isArray(payload?.details)
+          ? payload.details.filter((entry: unknown): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+          : []
+        const detailsSuffix = details.length > 0 ? ` ${details.join(' ')}` : ''
+        const rateLimitPrefix = response.status === 429 ? 'Rate limit reached.' : ''
+        throw new Error(`${rateLimitPrefix} ${payload?.error || 'Failed to parse recipe'}${detailsSuffix}`.trim())
       }
 
       const data = payload as ParseResponse
@@ -208,6 +265,8 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
           unit: ingredient.unit || 'unit',
         })),
       )
+      setParseWarnings(data.recipe.warnings || [])
+      setParseConfidence(data.recipe.confidence ?? null)
       setStep('review')
       toast.success('Recipe parsed. Review and save your meal.')
     } catch (error) {
@@ -371,7 +430,26 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
                     id="recipe-image"
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) => setSourceImage(event.target.files?.[0] || null)}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] || null
+                      if (!file) {
+                        setSourceImage(null)
+                        return
+                      }
+                      if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+                        toast.error('Only PNG, JPEG, and WEBP images are supported')
+                        event.currentTarget.value = ''
+                        setSourceImage(null)
+                        return
+                      }
+                      if (file.size > MAX_IMAGE_BYTES) {
+                        toast.error('Image file exceeds the 8MB upload limit')
+                        event.currentTarget.value = ''
+                        setSourceImage(null)
+                        return
+                      }
+                      setSourceImage(file)
+                    }}
                   />
                   <p className="text-xs text-muted-foreground">Supported: PNG, JPEG, WEBP (up to 8MB)</p>
                 </TabsContent>
@@ -397,6 +475,9 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
                   />
                 </TabsContent>
               </Tabs>
+              <div className="rounded-[10px] border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-950 dark:text-amber-100">
+                Imported URL/text/image content is sent to an external AI provider to extract recipe fields. Do not import sensitive personal data.
+              </div>
 
               {isParsing && (
                 <div className="rounded-[10px] border border-border/60 bg-surface-2/40 p-3 text-sm">
@@ -410,6 +491,26 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
             </div>
           ) : (
             <div className="space-y-4">
+              {(parseWarnings.length > 0 || parseConfidencePercent !== null) && (
+                <div className="space-y-2">
+                  {parseConfidencePercent !== null && (
+                    <div className="rounded-[10px] border border-border/60 bg-surface-2/40 p-3 text-sm">
+                      Parse confidence: {parseConfidencePercent}%
+                    </div>
+                  )}
+                  {parseWarnings.length > 0 && (
+                    <div className="rounded-[10px] border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-950 dark:text-amber-100">
+                      <p className="font-medium">Review notes</p>
+                      <ul className="mt-1 list-disc pl-5">
+                        {parseWarnings.map((warning, index) => (
+                          <li key={`${warning}-${index}`}>{warning}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="import-name">Meal name</Label>
                 <Input id="import-name" value={mealName} onChange={(event) => setMealName(event.target.value)} />

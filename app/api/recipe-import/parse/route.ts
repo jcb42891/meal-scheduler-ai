@@ -8,12 +8,23 @@ import { fetchRecipeTextFromUrl } from '@/lib/recipe-import/url'
 import { parseRecipeWithOpenAI } from '@/lib/recipe-import/openai'
 import { parseRecipeFromPlainTextFallback } from '@/lib/recipe-import/fallback'
 import { normalizeParsedRecipe } from '@/lib/recipe-import/normalize'
+import { checkRecipeImportRateLimit } from '@/lib/recipe-import/rate-limit'
 import type { ImportSourceType } from '@/lib/recipe-import/types'
 
 export const runtime = 'nodejs'
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
+const PARSE_TIMEOUT_MS = 25_000
+
+class HttpError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
 
 type ParsedInput = {
   groupId: string
@@ -63,13 +74,13 @@ async function parseRequestInput(req: NextRequest): Promise<ParsedInput> {
 
 function validateImageFile(imageFile?: File): asserts imageFile is File {
   if (!imageFile) {
-    throw new Error('An image file is required when sourceType is image.')
+    throw new HttpError('An image file is required when sourceType is image.', 400)
   }
   if (!ALLOWED_IMAGE_TYPES.has(imageFile.type)) {
-    throw new Error('Only PNG, JPEG, and WEBP images are supported.')
+    throw new HttpError('Only PNG, JPEG, and WEBP images are supported.', 400)
   }
   if (imageFile.size > MAX_IMAGE_BYTES) {
-    throw new Error('Image file exceeds the 8MB upload limit.')
+    throw new HttpError('Image file exceeds the 8MB upload limit.', 400)
   }
 }
 
@@ -92,6 +103,41 @@ async function userHasGroupAccess(
 async function toDataUrl(file: File): Promise<string> {
   const bytes = Buffer.from(await file.arrayBuffer())
   return `data:${file.type};base64,${bytes.toString('base64')}`
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new HttpError(timeoutMessage, 504)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
+}
+
+function statusFromError(error: Error): number {
+  const message = error.message.toLowerCase()
+
+  if (message.includes('timed out')) return 504
+  if (message.includes('rate limit')) return 429
+  if (
+    message.includes('invalid recipe url') ||
+    message.includes('http/https') ||
+    message.includes('private or local') ||
+    message.includes('required for') ||
+    message.includes('upload limit') ||
+    message.includes('supported')
+  ) {
+    return 400
+  }
+
+  if (message.includes('blocked automated access')) return 422
+  return 500
 }
 
 export async function POST(req: NextRequest) {
@@ -119,6 +165,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden: you do not have access to this group.' }, { status: 403 })
     }
 
+    const rateLimitKey = `${session.user.id}:${groupId}`
+    const rateLimit = checkRecipeImportRateLimit(rateLimitKey)
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: `Too many recipe imports. Try again in about ${rateLimit.retryAfterSeconds} seconds.`,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.retryAfterSeconds),
+          },
+        },
+      )
+    }
+
     const warnings: string[] = []
     let sourceText = ''
     let imageDataUrl: string | undefined
@@ -127,7 +190,7 @@ export async function POST(req: NextRequest) {
     if (input.sourceType === 'text') {
       const rawText = input.text?.trim() ?? ''
       if (!rawText) {
-        return NextResponse.json({ error: 'Recipe text is required for text import.' }, { status: 400 })
+        throw new HttpError('Recipe text is required for text import.', 400)
       }
       sourceText = rawText
     }
@@ -135,7 +198,7 @@ export async function POST(req: NextRequest) {
     if (input.sourceType === 'url') {
       const rawUrl = input.url?.trim() ?? ''
       if (!rawUrl) {
-        return NextResponse.json({ error: 'Recipe URL is required for URL import.' }, { status: 400 })
+        throw new HttpError('Recipe URL is required for URL import.', 400)
       }
 
       const extracted = await fetchRecipeTextFromUrl(rawUrl)
@@ -152,12 +215,16 @@ export async function POST(req: NextRequest) {
 
     let parsedRecipe
     try {
-      parsedRecipe = await parseRecipeWithOpenAI({
-        sourceType: input.sourceType,
-        sourceText,
-        imageDataUrl,
-        sourceUrl,
-      })
+      parsedRecipe = await withTimeout(
+        parseRecipeWithOpenAI({
+          sourceType: input.sourceType,
+          sourceText,
+          imageDataUrl,
+          sourceUrl,
+        }),
+        PARSE_TIMEOUT_MS,
+        'AI parsing timed out. Try a shorter recipe input or try again.',
+      )
     } catch (error) {
       const fallbackParsedRecipe = input.sourceType === 'text' ? parseRecipeFromPlainTextFallback(sourceText) : null
 
@@ -193,7 +260,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      if (error instanceof HttpError) {
+        return NextResponse.json({ error: error.message }, { status: error.status })
+      }
+
+      return NextResponse.json({ error: error.message }, { status: statusFromError(error) })
     }
 
     return NextResponse.json({ error: 'Unexpected server error.' }, { status: 500 })
