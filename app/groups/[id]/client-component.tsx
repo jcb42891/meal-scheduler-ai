@@ -131,7 +131,7 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
       const { data: invitedProfile, error: invitedProfileError } = await supabase
         .from('profiles')
         .select('id')
-        .ilike('email', normalizedInviteEmail)
+        .eq('email', normalizedInviteEmail)
         .limit(1)
         .maybeSingle()
 
@@ -162,7 +162,7 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
         .from('group_invitations')
         .select('id, status')
         .eq('group_id', groupId)
-        .ilike('email', normalizedInviteEmail)
+        .eq('email', normalizedInviteEmail)
         .eq('status', 'pending')
         .limit(1)
         .maybeSingle()
