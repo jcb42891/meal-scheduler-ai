@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -13,9 +13,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import Image from "next/image"
 import authBgImage from '@/public/auth-bg.jpg'
 
+const DEFAULT_SIGNED_IN_PATH = '/calendar'
 
-export default function AuthPage() {
+function getSafeNextPath(rawPath: string | null) {
+  if (rawPath && rawPath.startsWith('/') && !rawPath.startsWith('//') && !rawPath.startsWith('/api/')) {
+    return rawPath
+  }
+
+  return DEFAULT_SIGNED_IN_PATH
+}
+
+function AuthPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,22 +35,23 @@ export default function AuthPage() {
   const [resetEmail, setResetEmail] = useState('')
   const [isResetting, setIsResetting] = useState(false)
   const [activeTab, setActiveTab] = useState('signin')
+  const nextPath = getSafeNextPath(searchParams.get('next'))
 
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
-        router.replace('/calendar')
+        router.replace(nextPath)
       }
     }
     checkSession()
-  }, [router])
+  }, [nextPath, router])
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace('/calendar')
+      router.replace(nextPath)
     }
-  }, [authLoading, router, user])
+  }, [authLoading, nextPath, router, user])
 
   if (authLoading || user) {
     return <div className="min-h-[calc(100vh-4rem)]" />
@@ -62,21 +73,13 @@ export default function AuthPage() {
         return
       }
 
-      if (authData.user) {
-        // Manually create profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            { id: authData.user.id, email: authData.user.email }
-          ])
-
-        if (profileError) {
-          console.error('Profile creation failed')
-        }
+      if (authData.session) {
+        toast.success('Account created successfully')
+      } else {
+        toast.success('Check your email for the confirmation link')
+        setActiveTab('signin')
       }
 
-      toast.success('Check your email for the confirmation link')
-      setActiveTab('signin')
       setEmail('')
       setPassword('')
     } catch {
@@ -104,7 +107,7 @@ export default function AuthPage() {
         return
       }
 
-      router.replace('/calendar')
+      router.replace(nextPath)
     } catch {
       console.error('Sign in failed')
       setError('An unexpected error occurred')
@@ -268,4 +271,12 @@ export default function AuthPage() {
       </Dialog>
     </div>
   )
-} 
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[calc(100vh-4rem)]" />}>
+      <AuthPageContent />
+    </Suspense>
+  )
+}

@@ -13,8 +13,12 @@ import { PageHeader } from '@/components/page-header'
 type Invitation = {
   id: string
   email: string
-  status: 'pending' | 'accepted' | 'declined'
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'revoked'
   created_at: string
+  expires_at: string | null
+  email_delivery_status: 'pending' | 'sent' | 'failed'
+  email_delivery_error: string | null
+  email_delivery_attempted_at: string | null
 }
 
 type Group = {
@@ -30,7 +34,7 @@ type Profile = {
 type MemberWithProfile = {
   user_id: string
   role: string
-  profile: Profile
+  profile: Profile | null
 }
 
 export function GroupManageClient({ groupId }: { groupId: string }) {
@@ -73,14 +77,14 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
   const fetchInvitations = async () => {
     const { data, error } = await supabase
       .from('group_invitations')
-      .select('*')
+      .select('id, email, status, created_at, expires_at, email_delivery_status, email_delivery_error, email_delivery_attempted_at')
       .eq('group_id', groupId)
       .order('created_at', { ascending: false })
 
     if (error) {
       toast.error('Failed to load invitations')
     } else {
-      setInvitations(data)
+      setInvitations(data as Invitation[])
     }
   }
 
@@ -90,7 +94,7 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
       .select(`
         user_id,
         role,
-        profile:profiles!user_id(email)
+        profile:profiles!group_members_user_id_fkey(email)
       `)
       .eq('group_id', groupId)
       .returns<MemberWithProfile[]>()
@@ -104,15 +108,13 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
     const transformedData = data.map(member => ({
       user_id: member.user_id,
       role: member.role,
-      profile: {
-        email: member.profile.email || 'No email'
-      }
+      profile: member.profile
     }))
 
     setMembers(transformedData)
   }
 
-  const handleInvite = async (e: React.FormEvent) => {
+  const handleInvite = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!user) {
       toast.error('You must be signed in to send invitations')
@@ -128,71 +130,32 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
     setIsLoading(true)
 
     try {
-      const { data: invitedProfile, error: invitedProfileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', normalizedInviteEmail)
-        .limit(1)
-        .maybeSingle()
+      const response = await fetch('/api/groups/invitations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          groupId,
+          email: normalizedInviteEmail,
+        }),
+      })
 
-      if (invitedProfileError) {
-        throw invitedProfileError
-      }
-
-      if (invitedProfile?.id) {
-        const { data: existingMember, error: existingMemberError } = await supabase
-          .from('group_members')
-          .select('user_id')
-          .eq('group_id', groupId)
-          .eq('user_id', invitedProfile.id)
-          .maybeSingle()
-
-        if (existingMemberError) {
-          throw existingMemberError
-        }
-
-        if (existingMember) {
-          toast.error('That user is already a member of this group')
-          return
-        }
-      }
-
-      // Check if invitation already exists
-      const { data: existingInvite, error: existingInviteError } = await supabase
-        .from('group_invitations')
-        .select('id, status')
-        .eq('group_id', groupId)
-        .eq('email', normalizedInviteEmail)
-        .eq('status', 'pending')
-        .limit(1)
-        .maybeSingle()
-
-      if (existingInviteError) {
-        throw existingInviteError
-      }
-
-      if (existingInvite) {
-        toast.error('An invitation is already pending for this email')
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        toast.error(payload.error || 'Failed to create invitation')
         return
       }
 
-      // Create new invitation
-      const { error: inviteError } = await supabase
-        .from('group_invitations')
-        .insert({
-          group_id: groupId,
-          email: normalizedInviteEmail,
-          invited_by: user.id,
-          status: 'pending'
-        })
+      if (payload?.emailDelivery?.status === 'sent') {
+        toast.success('Invitation sent successfully')
+      } else {
+        toast.warning('Invitation created, but email delivery failed. Share the link manually.')
+      }
 
-      if (inviteError) throw inviteError
-
-      toast.success('Invitation created successfully')
       setInviteEmail('')
       fetchInvitations()
     } catch {
-      console.error('Failed to create invitation')
       toast.error('Failed to create invitation')
     } finally {
       setIsLoading(false)
@@ -200,20 +163,27 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
   }
 
   const copyInviteLink = async (inviteId: string) => {
-    // Create a short URL using a service like TinyURL
-    const longUrl = `${window.location.origin}/groups/accept-invite?token=${groupId}&invite=${inviteId}`
-    
     try {
-      const response = await fetch('https://tinyurl.com/api-create.php?url=' + encodeURIComponent(longUrl))
-      const shortUrl = await response.text()
-      
-      await navigator.clipboard.writeText(shortUrl)
+      const response = await fetch('/api/groups/invitations/link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          groupId,
+          inviteId,
+        }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || !payload?.inviteUrl) {
+        throw new Error(payload?.error || 'Failed to generate invite link')
+      }
+
+      await navigator.clipboard.writeText(payload.inviteUrl)
       toast.success('Invite link copied to clipboard')
     } catch {
-      console.error('Invite link shortening failed')
-      // Fallback to copying long URL
-      await navigator.clipboard.writeText(longUrl)
-      toast.success('Invite link copied to clipboard')
+      toast.error('Failed to copy invite link')
     }
   }
 
@@ -318,7 +288,7 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
                 {members.map((member) => (
                   <tr key={member.user_id} className="border-b">
                     <td className="p-4 break-all">
-                      {member.profile.email}
+                      {member.profile?.email || 'No email'}
                       {member.user_id === user?.id && (
                         <span className="ml-2 text-sm text-muted-foreground">(me)</span>
                       )}
@@ -348,6 +318,15 @@ export function GroupManageClient({ groupId }: { groupId: string }) {
                     <p className="text-sm text-muted-foreground">
                       Invited {new Date(invite.created_at).toLocaleDateString()}
                     </p>
+                    <p className="text-sm text-muted-foreground">
+                      Expires {invite.expires_at ? new Date(invite.expires_at).toLocaleDateString() : 'Unknown'}
+                    </p>
+                    <p className="text-sm text-muted-foreground capitalize">
+                      Email delivery: {invite.email_delivery_status}
+                    </p>
+                    {invite.email_delivery_status === 'failed' && invite.email_delivery_error && (
+                      <p className="text-sm text-destructive">{invite.email_delivery_error}</p>
+                    )}
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                     <Button

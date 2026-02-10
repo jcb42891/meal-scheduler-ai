@@ -2,27 +2,45 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+const AUTH_PATH = '/auth'
+const DEFAULT_SIGNED_IN_REDIRECT = '/calendar'
+const PUBLIC_PATHS = new Set<string>([
+  AUTH_PATH,
+  '/auth/update-password',
+  '/update-password',
+])
+
+function isSafeNextPath(value: string | null): value is string {
+  return Boolean(value && value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/api/'))
+}
+
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   const supabase = createMiddlewareClient({ req, res })
+  const pathname = req.nextUrl.pathname
+  const isApiRequest = pathname.startsWith('/api/')
 
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
-  // If there's no session and the user is trying to access a protected route
-  if (!session && req.nextUrl.pathname !== '/auth') {
-    return NextResponse.redirect(new URL('/auth', req.url))
+  if (!session && !PUBLIC_PATHS.has(pathname)) {
+    if (isApiRequest) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const authUrl = new URL(AUTH_PATH, req.url)
+    authUrl.searchParams.set('next', `${pathname}${req.nextUrl.search}`)
+    return NextResponse.redirect(authUrl)
   }
 
-  // If there's a session and the user is on the auth page
-  if (session && req.nextUrl.pathname === '/auth') {
-    return NextResponse.redirect(new URL('/calendar', req.url))
-  }
+  if (session && pathname === AUTH_PATH) {
+    const requestedNext = req.nextUrl.searchParams.get('next')
+    const safeNextPath = isSafeNextPath(requestedNext)
+      ? requestedNext
+      : DEFAULT_SIGNED_IN_REDIRECT
 
-  // If accessing the password update page, check for hash fragment
-  if (req.nextUrl.pathname === '/auth/update-password') {
-    return res
+    return NextResponse.redirect(new URL(safeNextPath, req.url))
   }
 
   return res
@@ -30,9 +48,16 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
+    '/auth',
     '/auth/update-password',
+    '/update-password',
     '/groups/:path*',
     '/calendar/:path*',
-    '/grocery-list/:path*'
+    '/grocery-list/:path*',
+    '/meals/:path*',
+    '/staples/:path*',
+    '/profile/:path*',
+    '/api/recipe-import/:path*',
+    '/api/groups/invitations/:path*',
   ]
-} 
+}

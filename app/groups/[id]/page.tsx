@@ -1,10 +1,10 @@
 import { GroupManageClient } from './client-component'
-import { PageProps } from '@/.next/types/app/groups/[id]/page'
 
-type GroupPageProps = PageProps & {
-  params: { id: string }
+type GroupPageProps = {
+  params: Promise<{ id: string }>
 }
 
-export default function GroupManagePage({ params }: GroupPageProps) {
-  return <GroupManageClient groupId={params.id} />
-} 
+export default async function GroupManagePage({ params }: GroupPageProps) {
+  const { id } = await params
+  return <GroupManageClient groupId={id} />
+}

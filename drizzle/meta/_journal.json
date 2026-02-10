@@ -29,6 +29,13 @@
       "when": 1769947475000,
       "tag": "0003_m1_security_data_access_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1769951075000,
+      "tag": "0004_m2_invitation_delivery_tracking",
+      "breakpoints": true
     }
   ]
 }
