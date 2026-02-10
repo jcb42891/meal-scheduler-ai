@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/contexts/AuthContext'
@@ -23,7 +23,7 @@ function getSafeNextPath(rawPath: string | null) {
   return DEFAULT_SIGNED_IN_PATH
 }
 
-export default function AuthPage() {
+function AuthPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
@@ -271,4 +271,12 @@ export default function AuthPage() {
       </Dialog>
     </div>
   )
-} 
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[calc(100vh-4rem)]" />}>
+      <AuthPageContent />
+    </Suspense>
+  )
+}
