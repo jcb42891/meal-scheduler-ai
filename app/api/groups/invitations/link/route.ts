@@ -20,6 +20,7 @@ type InvitationRow = {
   email: string
   status: string
   expires_at: string | null
+  invited_by: string
 }
 
 function toErrorMessage(error: unknown) {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     const { data: invitation, error: invitationError } = await supabase
       .from('group_invitations')
-      .select('id, group_id, email, status, expires_at')
+      .select('id, group_id, email, status, expires_at, invited_by')
       .eq('id', inviteId)
       .eq('group_id', groupId)
       .maybeSingle<InvitationRow>()
@@ -71,13 +72,18 @@ export async function POST(request: NextRequest) {
 
     const isExpired = invitation.expires_at ? new Date(invitation.expires_at).getTime() <= Date.now() : false
     if (isExpired) {
-      const { error: expireError } = await supabase
-        .from('group_invitations')
-        .update({ status: 'expired' })
-        .eq('id', invitation.id)
-        .eq('status', 'pending')
+      const canUpdateExpiredStatus =
+        session.user.id === group.owner_id || session.user.id === invitation.invited_by
 
-      if (expireError) throw expireError
+      if (canUpdateExpiredStatus) {
+        const { error: expireError } = await supabase
+          .from('group_invitations')
+          .update({ status: 'expired' })
+          .eq('id', invitation.id)
+          .eq('status', 'pending')
+
+        if (expireError) throw expireError
+      }
 
       return NextResponse.json({ error: 'Invitation has expired.' }, { status: 410 })
     }

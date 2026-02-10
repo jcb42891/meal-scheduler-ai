@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
@@ -95,6 +96,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'An invitation is already pending for this email.' }, { status: 409 })
     }
 
+    const appOrigin = resolveAppOrigin(request)
+    createSignedInviteToken({
+      inviteId: crypto.randomUUID(),
+      expiresAt: null,
+    })
+
     const { data: invitation, error: invitationError } = await supabase
       .from('group_invitations')
       .insert({
@@ -115,7 +122,7 @@ export async function POST(request: NextRequest) {
       inviteId: invitation.id,
       expiresAt: invitation.expires_at,
     })
-    const inviteUrl = `${resolveAppOrigin(request)}/groups/accept-invite?token=${encodeURIComponent(inviteToken)}`
+    const inviteUrl = `${appOrigin}/groups/accept-invite?token=${encodeURIComponent(inviteToken)}`
     const attemptedAt = new Date().toISOString()
     const inviterEmail = normalizeEmailAddress(session.user.email ?? '')
 
@@ -184,4 +191,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: toErrorMessage(error) }, { status: 500 })
   }
 }
-
