@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { buildClientAppUrl } from '@/lib/client-app-url'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -63,9 +64,13 @@ function AuthPageContent() {
     setError(null)
     
     try {
+      const confirmationRedirect = buildClientAppUrl(`/auth?next=${encodeURIComponent(nextPath)}`)
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
-        password
+        password,
+        options: {
+          emailRedirectTo: confirmationRedirect,
+        },
       })
 
       if (authError) {
@@ -126,7 +131,7 @@ function AuthPageContent() {
     setIsResetting(true)
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/update-password`,
+        redirectTo: buildClientAppUrl('/update-password'),
       })
 
       if (error) {

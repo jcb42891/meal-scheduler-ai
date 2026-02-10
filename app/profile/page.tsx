@@ -7,6 +7,7 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
+import { buildClientAppUrl } from '@/lib/client-app-url'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/page-header'
 
@@ -55,7 +56,7 @@ export default function ProfilePage() {
     setIsResetting(true)
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${window.location.origin}/update-password`,
+        redirectTo: buildClientAppUrl('/update-password'),
       })
 
       if (error) {
