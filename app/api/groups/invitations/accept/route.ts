@@ -87,6 +87,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This invitation does not belong to your account.' }, { status: 403 })
     }
 
+    // Ensure invitees always have a profile row before creating group membership.
+    const { error: profileUpsertError } = await supabase.from('profiles').upsert(
+      {
+        id: session.user.id,
+        email: normalizedUserEmail,
+      },
+      {
+        onConflict: 'id',
+      },
+    )
+
+    if (profileUpsertError) {
+      throw profileUpsertError
+    }
+
     const { error: membershipError } = await supabase.from('group_members').insert({
       group_id: invitation.group_id,
       user_id: session.user.id,

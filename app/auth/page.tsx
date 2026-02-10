@@ -73,21 +73,13 @@ export default function AuthPage() {
         return
       }
 
-      if (authData.user) {
-        // Manually create profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            { id: authData.user.id, email: authData.user.email }
-          ])
-
-        if (profileError) {
-          console.error('Profile creation failed')
-        }
+      if (authData.session) {
+        toast.success('Account created successfully')
+      } else {
+        toast.success('Check your email for the confirmation link')
+        setActiveTab('signin')
       }
 
-      toast.success('Check your email for the confirmation link')
-      setActiveTab('signin')
       setEmail('')
       setPassword('')
     } catch {

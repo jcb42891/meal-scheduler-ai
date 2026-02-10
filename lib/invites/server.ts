@@ -37,8 +37,39 @@ export function normalizeEmailAddress(email: string) {
   return email.trim().toLowerCase()
 }
 
+function toOrigin(value: string) {
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
+}
+
+function isLocalOrigin(value: string) {
+  try {
+    const hostname = new URL(value).hostname
+    return hostname === 'localhost' || hostname === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
+
 export function resolveAppOrigin(request: NextRequest) {
-  return request.nextUrl.origin
+  const requestOrigin = request.nextUrl.origin
+  const allowDevOverride = process.env.INVITE_APP_ORIGIN_ALLOW_DEV_OVERRIDE === 'true'
+  const shouldPreferRequestOrigin = isLocalOrigin(requestOrigin) && !allowDevOverride
+
+  const configuredOrigin = process.env.INVITE_APP_ORIGIN
+  if (configuredOrigin && !shouldPreferRequestOrigin) {
+    const parsedOrigin = toOrigin(configuredOrigin)
+    if (!parsedOrigin) {
+      throw new Error('INVITE_APP_ORIGIN must be a valid absolute URL.')
+    }
+
+    return parsedOrigin
+  }
+
+  return requestOrigin
 }
 
 export async function assertCanManageGroupInvites(

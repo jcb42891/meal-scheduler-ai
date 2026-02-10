@@ -8,7 +8,6 @@ const PUBLIC_PATHS = new Set<string>([
   AUTH_PATH,
   '/auth/update-password',
   '/update-password',
-  '/groups/accept-invite',
 ])
 
 function isSafeNextPath(value: string | null): value is string {

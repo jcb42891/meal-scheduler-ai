@@ -1,9 +1,10 @@
 import { GroupManageClient } from './client-component'
 
 type GroupPageProps = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default function GroupManagePage({ params }: GroupPageProps) {
-  return <GroupManageClient groupId={params.id} />
+export default async function GroupManagePage({ params }: GroupPageProps) {
+  const { id } = await params
+  return <GroupManageClient groupId={id} />
 }
