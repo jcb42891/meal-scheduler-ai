@@ -36,6 +36,20 @@
       "when": 1769951075000,
       "tag": "0004_m2_invitation_delivery_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1769954675000,
+      "tag": "0005_m3_durable_usage_metering",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769958275000,
+      "tag": "0006_m3_credit_function_ambiguity_fix",
+      "breakpoints": true
     }
   ]
 }

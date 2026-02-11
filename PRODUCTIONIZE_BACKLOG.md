@@ -1,7 +1,7 @@
 # Productionize + Monetization Backlog
 
 Created: February 8, 2026  
-Last Updated: February 8, 2026 (M2 complete)  
+Last Updated: February 11, 2026 (M3 complete)  
 Primary Goal: productionize Pantry Planner and ship a sustainable monetization model, starting with Magic Import.
 
 ## Status Legend
@@ -29,7 +29,7 @@ Primary Goal: productionize Pantry Planner and ship a sustainable monetization m
 | M0 | Backlog governance and tracking setup | P0 | Complete | February 2026 | This backlog exists, with status rules, milestones, and progress log. |
 | M1 | Security and data access hardening | P0 | Complete | February 2026 | RLS/policy gaps are closed and validated with access tests. |
 | M2 | Auth, routing, and invite flow reliability | P0 | Complete | February 2026 | Protected routes are fully gated and invite flow is robust/reliable. |
-| M3 | Durable usage metering and rate limiting | P0 | Not started | February to March 2026 | Import quotas and limits are persistent and enforceable across instances. |
+| M3 | Durable usage metering and rate limiting | P0 | Complete | February to March 2026 | Import quotas and limits are persistent and enforceable across instances. |
 | M4 | Billing + entitlement system for Magic Import | P0 | Not started | March 2026 | Paid plans, webhooks, entitlements, and paywall are live end to end. |
 | M5 | Magic Import quality + margin optimization | P1 | Not started | March to April 2026 | URL deterministic parsing, model usage optimization, and parse quality metrics are in place. |
 | M6 | Core product UX/data model upgrades | P1 | Not started | April 2026 | Structured recipe data and improved grocery output are shipped. |
@@ -59,10 +59,10 @@ Primary Goal: productionize Pantry Planner and ship a sustainable monetization m
 ### M3: Durable Usage Metering and Rate Limiting
 | ID | Priority | Status | Item | Dependencies | Acceptance Criteria |
 | --- | --- | --- | --- | --- | --- |
-| USG-001 | P0 | Not started | Replace in-memory import limiter in `lib/recipe-import/rate-limit.ts` with persistent distributed limiter (Redis or DB-backed). | None | Limits remain enforced across restarts and multi-instance deployments. |
-| USG-002 | P0 | Not started | Create `import_usage_events` ledger table to record each parse attempt/success/failure with source type and cost metadata. | USG-001 | Every parse call records an auditable usage event. |
-| USG-003 | P0 | Not started | Add monthly credit accounting tables/functions for entitlement checks. | USG-002 | User/group remaining credits are queryable and accurate. |
-| USG-004 | P1 | Not started | Add admin/reporting queries for usage and overage analysis. | USG-003 | Team can view usage by day, source type, and plan tier. |
+| USG-001 | P0 | Complete | Replace in-memory import limiter in `lib/recipe-import/rate-limit.ts` with persistent distributed limiter (Redis or DB-backed). | None | Limits remain enforced across restarts and multi-instance deployments. |
+| USG-002 | P0 | Complete | Create `import_usage_events` ledger table to record each parse attempt/success/failure with source type and cost metadata. | USG-001 | Every parse call records an auditable usage event. |
+| USG-003 | P0 | Complete | Add monthly credit accounting tables/functions for entitlement checks. | USG-002 | User/group remaining credits are queryable and accurate. |
+| USG-004 | P1 | Complete | Add admin/reporting queries for usage and overage analysis. | USG-003 | Team can view usage by day, source type, and plan tier. |
 
 ### M4: Billing + Entitlements for Magic Import
 | ID | Priority | Status | Item | Dependencies | Acceptance Criteria |
@@ -142,3 +142,9 @@ Primary Goal: productionize Pantry Planner and ship a sustainable monetization m
 - 2026-02-08: APP-004 moved to `Complete` after moving invite/member validation into server routes and fixing member relation usage in `app/groups/[id]/client-component.tsx`.
 - 2026-02-08: APP-005 moved to `Complete` after implementing transactional invite email delivery in `supabase/functions/send-group-invite/index.ts` and tracking delivery metadata on invitations.
 - 2026-02-08: M2 moved to `Complete` after validating protected route behavior, invite-link signing/expiry, first-party invite sharing, and TypeScript/lint checks.
+- 2026-02-11: USG-001 moved to `Complete` after replacing in-memory import throttling with DB-backed `consume_recipe_import_rate_limit` enforcement.
+- 2026-02-11: USG-002 moved to `Complete` after adding `import_usage_events` and route-level attempt/success/failure event recording for every authenticated parse request.
+- 2026-02-11: USG-003 moved to `Complete` after adding monthly credit account/ledger tables and RPC functions for credit consumption and remaining-balance checks.
+- 2026-02-11: USG-004 moved to `Complete` after adding admin reporting views/functions for daily usage and monthly overage analysis by source type and plan tier.
+- 2026-02-11: M3 moved to `Complete` after validating persistent rate limiting, durable usage metering, credit accounting, and reporting query availability.
+- 2026-02-11: Added follow-up migration `drizzle/0006_m3_credit_function_ambiguity_fix.sql` to resolve credit-function column ambiguity and revalidated rate-limit/quota RPC behavior.

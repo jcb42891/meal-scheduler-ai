@@ -1,13 +1,11 @@
-import { pgTable, pgSchema, foreignKey, unique, pgPolicy, uuid, text, numeric, timestamp, boolean, date, index, uniqueIndex, check, primaryKey } from "drizzle-orm/pg-core"
+import { pgTable, pgSchema, foreignKey, unique, pgPolicy, uuid, text, numeric, timestamp, boolean, date, index, uniqueIndex, check, bigserial, integer, jsonb, bigint, primaryKey, pgView } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
-
 
 const auth = pgSchema("auth");
 
 export const usersInAuth = auth.table("users", {
 	id: uuid("id").notNull(),
 });
-
 
 export const staple_ingredients = pgTable("staple_ingredients", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
@@ -169,6 +167,120 @@ export const group_invitations = pgTable("group_invitations", {
 	check("group_invitations_status_check", sql`status = ANY (ARRAY['pending'::text, 'accepted'::text, 'declined'::text, 'expired'::text, 'revoked'::text])`),
 ]);
 
+export const import_usage_events = pgTable("import_usage_events", {
+	id: bigserial({ mode: "bigint" }).primaryKey().notNull(),
+	request_id: uuid().notNull(),
+	event_type: text().notNull(),
+	source_type: text().notNull(),
+	user_id: uuid(),
+	group_id: uuid(),
+	status_code: integer(),
+	error_code: text(),
+	error_message: text(),
+	provider: text(),
+	model: text(),
+	cost_credits: integer().default(0).notNull(),
+	cost_input_tokens: integer(),
+	cost_output_tokens: integer(),
+	cost_total_tokens: integer(),
+	cost_usd: numeric({ precision: 12, scale:  6 }),
+	latency_ms: integer(),
+	input_bytes: integer(),
+	output_ingredients_count: integer(),
+	warnings_count: integer(),
+	confidence: numeric({ precision: 4, scale:  3 }),
+	metadata: jsonb().default({}).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("import_usage_events_created_at_idx").using("btree", table.created_at.desc().nullsFirst().op("timestamptz_ops")),
+	index("import_usage_events_group_created_at_idx").using("btree", table.group_id.asc().nullsLast().op("timestamptz_ops"), table.created_at.desc().nullsFirst().op("uuid_ops")),
+	index("import_usage_events_request_id_idx").using("btree", table.request_id.asc().nullsLast().op("uuid_ops")),
+	index("import_usage_events_source_type_created_at_idx").using("btree", table.source_type.asc().nullsLast().op("timestamptz_ops"), table.created_at.desc().nullsFirst().op("timestamptz_ops")),
+	foreignKey({
+			columns: [table.group_id],
+			foreignColumns: [groups.id],
+			name: "import_usage_events_group_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [usersInAuth.id],
+			name: "import_usage_events_user_id_fkey"
+		}).onDelete("set null"),
+	check("import_usage_events_confidence_check", sql`(confidence IS NULL) OR ((confidence >= (0)::numeric) AND (confidence <= (1)::numeric))`),
+	check("import_usage_events_cost_credits_check", sql`cost_credits >= 0`),
+	check("import_usage_events_cost_input_tokens_check", sql`(cost_input_tokens IS NULL) OR (cost_input_tokens >= 0)`),
+	check("import_usage_events_cost_output_tokens_check", sql`(cost_output_tokens IS NULL) OR (cost_output_tokens >= 0)`),
+	check("import_usage_events_cost_total_tokens_check", sql`(cost_total_tokens IS NULL) OR (cost_total_tokens >= 0)`),
+	check("import_usage_events_cost_usd_check", sql`(cost_usd IS NULL) OR (cost_usd >= (0)::numeric)`),
+	check("import_usage_events_event_type_check", sql`event_type = ANY (ARRAY['attempt'::text, 'success'::text, 'failure'::text])`),
+	check("import_usage_events_input_bytes_check", sql`(input_bytes IS NULL) OR (input_bytes >= 0)`),
+	check("import_usage_events_latency_ms_check", sql`(latency_ms IS NULL) OR (latency_ms >= 0)`),
+	check("import_usage_events_output_ingredients_count_check", sql`(output_ingredients_count IS NULL) OR (output_ingredients_count >= 0)`),
+	check("import_usage_events_source_type_check", sql`source_type = ANY (ARRAY['image'::text, 'url'::text, 'text'::text])`),
+	check("import_usage_events_warnings_count_check", sql`(warnings_count IS NULL) OR (warnings_count >= 0)`),
+]);
+
+export const import_credit_accounts = pgTable("import_credit_accounts", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	scope_type: text().notNull(),
+	user_id: uuid(),
+	group_id: uuid(),
+	plan_tier: text().default('free').notNull(),
+	monthly_credits: integer().default(40).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	uniqueIndex("import_credit_accounts_group_id_unique_idx").using("btree", table.group_id.asc().nullsLast().op("uuid_ops")),
+	index("import_credit_accounts_plan_tier_idx").using("btree", table.plan_tier.asc().nullsLast().op("text_ops")),
+	uniqueIndex("import_credit_accounts_user_id_unique_idx").using("btree", table.user_id.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.group_id],
+			foreignColumns: [groups.id],
+			name: "import_credit_accounts_group_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [usersInAuth.id],
+			name: "import_credit_accounts_user_id_fkey"
+		}).onDelete("cascade"),
+	check("import_credit_accounts_monthly_credits_check", sql`monthly_credits >= 0`),
+	check("import_credit_accounts_scope_target_check", sql`((scope_type = 'user'::text) AND (user_id IS NOT NULL) AND (group_id IS NULL)) OR ((scope_type = 'group'::text) AND (group_id IS NOT NULL) AND (user_id IS NULL))`),
+	check("import_credit_accounts_scope_type_check", sql`scope_type = ANY (ARRAY['user'::text, 'group'::text])`),
+]);
+
+export const import_credit_ledger = pgTable("import_credit_ledger", {
+	id: bigserial({ mode: "bigint" }).primaryKey().notNull(),
+	account_id: uuid().notNull(),
+	period_start: date().notNull(),
+	entry_type: text().notNull(),
+	credits_delta: integer().notNull(),
+	source_type: text(),
+	request_id: uuid(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	usage_event_id: bigint({ mode: "number" }),
+	metadata: jsonb().default({}).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("import_credit_ledger_account_period_idx").using("btree", table.account_id.asc().nullsLast().op("date_ops"), table.period_start.asc().nullsLast().op("uuid_ops"), table.created_at.desc().nullsFirst().op("timestamptz_ops")),
+	uniqueIndex("import_credit_ledger_monthly_allocation_unique_idx").using("btree", table.account_id.asc().nullsLast().op("uuid_ops"), table.period_start.asc().nullsLast().op("date_ops")).where(sql`(entry_type = 'monthly_allocation'::text)`),
+	index("import_credit_ledger_request_id_idx").using("btree", table.request_id.asc().nullsLast().op("uuid_ops")),
+	uniqueIndex("import_credit_ledger_usage_event_unique_idx").using("btree", table.usage_event_id.asc().nullsLast().op("int8_ops")).where(sql`((usage_event_id IS NOT NULL) AND (entry_type = 'usage'::text))`),
+	foreignKey({
+			columns: [table.account_id],
+			foreignColumns: [import_credit_accounts.id],
+			name: "import_credit_ledger_account_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.usage_event_id],
+			foreignColumns: [import_usage_events.id],
+			name: "import_credit_ledger_usage_event_id_fkey"
+		}).onDelete("set null"),
+	check("import_credit_ledger_entry_type_check", sql`entry_type = ANY (ARRAY['monthly_allocation'::text, 'usage'::text, 'manual_adjustment'::text, 'refund'::text])`),
+	check("import_credit_ledger_monthly_allocation_delta_check", sql`(entry_type <> 'monthly_allocation'::text) OR (credits_delta >= 0)`),
+	check("import_credit_ledger_source_type_check", sql`(source_type IS NULL) OR (source_type = ANY (ARRAY['image'::text, 'url'::text, 'text'::text]))`),
+	check("import_credit_ledger_usage_delta_check", sql`(entry_type <> 'usage'::text) OR (credits_delta <= 0)`),
+]);
+
 export const meal_ingredients = pgTable("meal_ingredients", {
 	meal_id: uuid().notNull(),
 	ingredient_id: uuid().notNull(),
@@ -216,3 +328,54 @@ export const group_members = pgTable("group_members", {
 	pgPolicy("Members can leave groups and owners can remove members", { as: "permissive", for: "delete", to: ["authenticated"] }),
 	check("group_members_role_check", sql`role = ANY (ARRAY['owner'::text, 'member'::text])`),
 ]);
+
+export const import_rate_limits = pgTable("import_rate_limits", {
+	user_id: uuid().notNull(),
+	group_id: uuid().notNull(),
+	window_started_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	request_count: integer().default(0).notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("import_rate_limits_updated_at_idx").using("btree", table.updated_at.desc().nullsFirst().op("timestamptz_ops")),
+	foreignKey({
+			columns: [table.group_id],
+			foreignColumns: [groups.id],
+			name: "import_rate_limits_group_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [usersInAuth.id],
+			name: "import_rate_limits_user_id_fkey"
+		}).onDelete("cascade"),
+	primaryKey({ columns: [table.user_id, table.group_id], name: "import_rate_limits_pkey"}),
+	check("import_rate_limits_request_count_check", sql`request_count >= 0`),
+]);
+export const import_usage_daily_report = pgView("import_usage_daily_report", {	usage_date: date(),
+	source_type: text(),
+	plan_tier: text(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	attempts: bigint({ mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	successes: bigint({ mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	failures: bigint({ mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	credits_charged: bigint({ mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	input_tokens: bigint({ mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	output_tokens: bigint({ mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	total_tokens: bigint({ mode: "number" }),
+	estimated_cost_usd: numeric({ precision: 12, scale:  6 }),
+}).as(sql`SELECT date_trunc('day'::text, iue.created_at)::date AS usage_date, iue.source_type, COALESCE(ica.plan_tier, 'unassigned'::text) AS plan_tier, count(*) FILTER (WHERE iue.event_type = 'attempt'::text) AS attempts, count(*) FILTER (WHERE iue.event_type = 'success'::text) AS successes, count(*) FILTER (WHERE iue.event_type = 'failure'::text) AS failures, COALESCE(sum(iue.cost_credits), 0::bigint) AS credits_charged, COALESCE(sum(iue.cost_input_tokens), 0::bigint) AS input_tokens, COALESCE(sum(iue.cost_output_tokens), 0::bigint) AS output_tokens, COALESCE(sum(iue.cost_total_tokens), 0::bigint) AS total_tokens, COALESCE(sum(iue.cost_usd), 0::numeric)::numeric(12,6) AS estimated_cost_usd FROM import_usage_events iue LEFT JOIN import_credit_accounts ica ON ica.scope_type = 'group'::text AND ica.group_id = iue.group_id GROUP BY (date_trunc('day'::text, iue.created_at)::date), iue.source_type, (COALESCE(ica.plan_tier, 'unassigned'::text))`);
+
+export const import_usage_monthly_overage_report = pgView("import_usage_monthly_overage_report", {	period_start: date(),
+	scope_type: text(),
+	scope_id: uuid(),
+	plan_tier: text(),
+	included_credits: integer(),
+	used_credits: integer(),
+	overage_credits: integer(),
+	remaining_credits: integer(),
+}).as(sql`WITH monthly AS ( SELECT icl.period_start, ica.scope_type, COALESCE(ica.group_id, ica.user_id) AS scope_id, ica.plan_tier, COALESCE(sum( CASE WHEN icl.entry_type = 'monthly_allocation'::text THEN icl.credits_delta ELSE 0 END), 0::bigint)::integer AS included_credits, COALESCE(sum( CASE WHEN icl.entry_type = 'usage'::text THEN - icl.credits_delta ELSE 0 END), 0::bigint)::integer AS used_credits, COALESCE(sum(icl.credits_delta), 0::bigint)::integer AS remaining_credits FROM import_credit_ledger icl JOIN import_credit_accounts ica ON ica.id = icl.account_id GROUP BY icl.period_start, ica.scope_type, (COALESCE(ica.group_id, ica.user_id)), ica.plan_tier ) SELECT period_start, scope_type, scope_id, plan_tier, included_credits, used_credits, GREATEST(used_credits - included_credits, 0) AS overage_credits, remaining_credits FROM monthly`);

@@ -15,6 +15,20 @@ type ParseRecipeInput = {
 
 type LooseRecord = Record<string, unknown>
 
+export type ParseRecipeModelUsage = {
+  provider: 'openai'
+  model: string
+  inputTokens: number | null
+  outputTokens: number | null
+  totalTokens: number | null
+  estimatedCostUsd: number | null
+}
+
+export type ParseRecipeResult = {
+  recipe: ParsedRecipe
+  usage: ParseRecipeModelUsage
+}
+
 function getClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
@@ -72,6 +86,49 @@ function asNumber(value: unknown): number | null {
     if (Number.isFinite(parsed)) return parsed
   }
   return null
+}
+
+function asNonNegativeInteger(value: unknown): number | null {
+  const parsed = asNumber(value)
+  if (parsed === null || parsed < 0) return null
+  return Math.floor(parsed)
+}
+
+function getTokenCostPerMillion(envName: string): number | null {
+  const value = Number(process.env[envName] ?? '')
+  if (!Number.isFinite(value) || value < 0) return null
+  return value
+}
+
+function estimateTokenCostUsd(inputTokens: number | null, outputTokens: number | null): number | null {
+  if (inputTokens === null && outputTokens === null) return null
+
+  const inputCostPerMillion = getTokenCostPerMillion('RECIPE_IMPORT_INPUT_COST_PER_1M_USD')
+  const outputCostPerMillion = getTokenCostPerMillion('RECIPE_IMPORT_OUTPUT_COST_PER_1M_USD')
+
+  if (inputCostPerMillion === null || outputCostPerMillion === null) return null
+
+  const inputCost = (Math.max(inputTokens ?? 0, 0) / 1_000_000) * inputCostPerMillion
+  const outputCost = (Math.max(outputTokens ?? 0, 0) / 1_000_000) * outputCostPerMillion
+  return Number((inputCost + outputCost).toFixed(6))
+}
+
+function buildUsageMetadata(completion: OpenAI.Chat.Completions.ChatCompletion): ParseRecipeModelUsage {
+  const inputTokens = asNonNegativeInteger(completion.usage?.prompt_tokens)
+  const outputTokens = asNonNegativeInteger(completion.usage?.completion_tokens)
+  const totalTokensFromApi = asNonNegativeInteger(completion.usage?.total_tokens)
+  const totalTokens =
+    totalTokensFromApi ??
+    (inputTokens !== null || outputTokens !== null ? (inputTokens ?? 0) + (outputTokens ?? 0) : null)
+
+  return {
+    provider: 'openai',
+    model: completion.model?.trim() || DEFAULT_MODEL,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    estimatedCostUsd: estimateTokenCostUsd(inputTokens, outputTokens),
+  }
 }
 
 function firstString(record: LooseRecord, keys: string[]): string {
@@ -227,7 +284,7 @@ function coerceRecipeJsonShape(parsedJson: unknown, input: ParseRecipeInput): un
   }
 }
 
-export async function parseRecipeWithOpenAI(input: ParseRecipeInput): Promise<ParsedRecipe> {
+export async function parseRecipeWithOpenAI(input: ParseRecipeInput): Promise<ParseRecipeResult> {
   const client = getClient()
   const userContent: Array<Record<string, unknown>> = [{ type: 'text', text: buildUserPrompt(input) }]
 
@@ -261,12 +318,18 @@ export async function parseRecipeWithOpenAI(input: ParseRecipeInput): Promise<Pa
   }
 
   try {
-    return parsedRecipeSchema.parse(parsedJson)
+    return {
+      recipe: parsedRecipeSchema.parse(parsedJson),
+      usage: buildUsageMetadata(completion),
+    }
   } catch (error) {
     if (error instanceof ZodError) {
       try {
         const repaired = coerceRecipeJsonShape(parsedJson, input)
-        return parsedRecipeSchema.parse(repaired)
+        return {
+          recipe: parsedRecipeSchema.parse(repaired),
+          usage: buildUsageMetadata(completion),
+        }
       } catch {
         throw new Error('Model output did not match expected recipe schema.')
       }
