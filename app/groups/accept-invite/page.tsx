@@ -14,6 +14,7 @@ function AcceptInviteContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [isResolvingInvite, setIsResolvingInvite] = useState(true)
+  const [resolveErrorMessage, setResolveErrorMessage] = useState<string | null>(null)
   const [isCreatingAccount, setIsCreatingAccount] = useState(false)
   const [inviteeEmail, setInviteeEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -67,12 +68,13 @@ function AcceptInviteContent() {
 
     const processInvite = async () => {
       if (!token) {
-        toast.error('Invalid invitation link')
-        router.replace('/')
+        setResolveErrorMessage('Invalid invitation link.')
+        setIsResolvingInvite(false)
         return
       }
 
       setIsResolvingInvite(true)
+      setResolveErrorMessage(null)
 
       try {
         const {
@@ -103,14 +105,13 @@ function AcceptInviteContent() {
 
         if (!response.ok) {
           const fallbackMessage = 'Failed to process invitation'
-          if (response.status === 409) {
+          if (payload?.code === 'requires_sign_in') {
             toast.error(payload?.error || fallbackMessage)
             router.replace(`/auth?next=${encodeURIComponent(nextPath)}`)
             return
           }
 
-          toast.error(payload?.error || fallbackMessage)
-          router.replace('/')
+          setResolveErrorMessage(payload?.error || fallbackMessage)
           return
         }
 
@@ -120,8 +121,7 @@ function AcceptInviteContent() {
           return
         }
 
-        toast.error('Failed to process invitation')
-        router.replace('/')
+        setResolveErrorMessage('Failed to process invitation')
       } finally {
         if (isActive) {
           setIsResolvingInvite(false)
@@ -214,7 +214,7 @@ function AcceptInviteContent() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <h1 className="text-xl font-semibold">Unable to load invitation</h1>
+          <h1 className="text-xl font-semibold">{resolveErrorMessage ?? 'Unable to load invitation'}</h1>
         </div>
       </div>
     )

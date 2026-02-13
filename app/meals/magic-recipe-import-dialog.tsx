@@ -10,6 +10,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/contexts/AuthContext'
+import { getRecipeImportParseErrorMessage, readRecipeImportErrorPayload } from '@/lib/recipe-import/client-errors'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from './meal-utils'
@@ -105,6 +106,14 @@ function toTitleCase(value: string) {
 function getRandomParseLoadingMessage() {
   return PARSE_LOADING_MESSAGES[Math.floor(Math.random() * PARSE_LOADING_MESSAGES.length)]
 }
+
+function isParseResponse(payload: unknown): payload is ParseResponse {
+  if (!payload || typeof payload !== 'object') return false
+  const recipe = (payload as { recipe?: unknown }).recipe
+  return Boolean(recipe && typeof recipe === 'object')
+}
+
+class UserFacingParseError extends Error {}
 
 export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImported }: Props) {
   const { user } = useAuth()
@@ -237,21 +246,39 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
       if (sourceType === 'text') formData.append('text', sourceText.trim())
       if (sourceType === 'image' && sourceImage) formData.append('image', sourceImage)
 
-      const response = await fetch('/api/recipe-import/parse', {
-        method: 'POST',
-        body: formData,
-      })
-      const payload = await response.json()
-      if (!response.ok) {
-        const details = Array.isArray(payload?.details)
-          ? payload.details.filter((entry: unknown): entry is string => typeof entry === 'string' && entry.trim().length > 0)
-          : []
-        const detailsSuffix = details.length > 0 ? ` ${details.join(' ')}` : ''
-        const rateLimitPrefix = response.status === 429 ? 'Rate limit reached.' : ''
-        throw new Error(`${rateLimitPrefix} ${payload?.error || 'Failed to parse recipe'}${detailsSuffix}`.trim())
+      let response: Response
+      try {
+        response = await fetch('/api/recipe-import/parse', {
+          method: 'POST',
+          body: formData,
+        })
+      } catch {
+        throw new UserFacingParseError('Unable to reach recipe import. Check your connection and try again.')
       }
 
-      const data = payload as ParseResponse
+      let payload: unknown = null
+      try {
+        payload = await response.json()
+      } catch {
+        payload = null
+      }
+
+      if (!response.ok) {
+        const { code, retryAfterSeconds } = readRecipeImportErrorPayload(payload)
+        throw new UserFacingParseError(
+          getRecipeImportParseErrorMessage({
+            status: response.status,
+            code,
+            retryAfterSeconds,
+          }),
+        )
+      }
+
+      if (!isParseResponse(payload)) {
+        throw new UserFacingParseError('Recipe import returned an unexpected response. Please try again.')
+      }
+
+      const data = payload
       setMealName(data.recipe.name || '')
       setDescription(data.recipe.description || '')
       setCategory(data.recipe.category || '')
@@ -271,7 +298,11 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
       toast.success('Recipe parsed. Review and save your meal.')
     } catch (error) {
       console.error('Error parsing recipe:', error)
-      toast.error(error instanceof Error ? error.message : 'Failed to parse recipe')
+      const message =
+        error instanceof UserFacingParseError
+          ? error.message
+          : 'We could not import that recipe right now. Please try again.'
+      toast.error(message)
     } finally {
       setIsParsing(false)
     }
