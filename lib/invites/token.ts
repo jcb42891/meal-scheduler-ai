@@ -3,20 +3,30 @@ import 'server-only'
 import crypto from 'crypto'
 import { z } from 'zod'
 
-const INVITE_TOKEN_VERSION = 1
+const INVITE_TOKEN_VERSION = 2
 const INVITE_FALLBACK_TTL_SECONDS = 7 * 24 * 60 * 60
 const MIN_INVITE_TOKEN_SECRET_LENGTH = 32
 
-const inviteTokenClaimsSchema = z.object({
-  v: z.literal(INVITE_TOKEN_VERSION),
+const legacyInviteTokenClaimsSchema = z.object({
+  v: z.literal(1),
   inviteId: z.string().uuid(),
   exp: z.number().int().positive(),
 })
 
+const inviteTokenClaimsSchema = z.object({
+  v: z.literal(INVITE_TOKEN_VERSION),
+  inviteId: z.string().uuid(),
+  inviteeEmail: z.string().email(),
+  exp: z.number().int().positive(),
+})
+
 type InviteTokenClaims = z.infer<typeof inviteTokenClaimsSchema>
+type LegacyInviteTokenClaims = z.infer<typeof legacyInviteTokenClaimsSchema>
+type VerifiableInviteTokenClaims = InviteTokenClaims | LegacyInviteTokenClaims
 
 type CreateInviteTokenInput = {
   inviteId: string
+  inviteeEmail: string
   expiresAt: string | Date | null | undefined
 }
 
@@ -61,9 +71,11 @@ function toUnixSeconds(expiresAt: CreateInviteTokenInput['expiresAt']) {
 }
 
 export function createSignedInviteToken(input: CreateInviteTokenInput) {
+  const normalizedInviteeEmail = input.inviteeEmail.trim().toLowerCase()
   const claims: InviteTokenClaims = {
     v: INVITE_TOKEN_VERSION,
     inviteId: input.inviteId,
+    inviteeEmail: normalizedInviteeEmail,
     exp: toUnixSeconds(input.expiresAt),
   }
 
@@ -74,7 +86,7 @@ export function createSignedInviteToken(input: CreateInviteTokenInput) {
 }
 
 type VerifyInviteTokenResult =
-  | { valid: true; claims: InviteTokenClaims }
+  | { valid: true; claims: VerifiableInviteTokenClaims }
   | { valid: false; reason: string }
 
 export function verifySignedInviteToken(token: string): VerifyInviteTokenResult {
@@ -89,9 +101,11 @@ export function verifySignedInviteToken(token: string): VerifyInviteTokenResult 
     return { valid: false, reason: 'Invalid token signature.' }
   }
 
-  let parsedClaims: InviteTokenClaims
+  let parsedClaims: VerifiableInviteTokenClaims
   try {
-    parsedClaims = inviteTokenClaimsSchema.parse(JSON.parse(fromBase64Url(payloadSegment)))
+    parsedClaims = z
+      .union([inviteTokenClaimsSchema, legacyInviteTokenClaimsSchema])
+      .parse(JSON.parse(fromBase64Url(payloadSegment)))
   } catch {
     return { valid: false, reason: 'Malformed token payload.' }
   }

@@ -28,6 +28,8 @@ function AuthPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
+  const requestedEmail = searchParams.get('email')?.trim().toLowerCase() ?? ''
+  const requestedMode = searchParams.get('mode')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -53,6 +55,18 @@ function AuthPageContent() {
       router.replace(nextPath)
     }
   }, [authLoading, nextPath, router, user])
+
+  useEffect(() => {
+    if (requestedEmail) {
+      setEmail(requestedEmail)
+    }
+  }, [requestedEmail])
+
+  useEffect(() => {
+    if (requestedMode === 'signin' || requestedMode === 'signup') {
+      setActiveTab(requestedMode)
+    }
+  }, [requestedMode])
 
   if (authLoading || user) {
     return <div className="min-h-[calc(100vh-4rem)]" />

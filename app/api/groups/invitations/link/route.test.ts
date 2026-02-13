@@ -201,6 +201,7 @@ describe('POST /api/groups/invitations/link', () => {
 
     expect(createSignedInviteTokenMock).toHaveBeenCalledWith({
       inviteId: 'invite-1',
+      inviteeEmail: 'invitee@example.com',
       expiresAt: '2030-01-01T00:00:00.000Z',
     })
     expect(response.status).toBe(200)

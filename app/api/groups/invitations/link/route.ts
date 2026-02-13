@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
 
     const inviteToken = createSignedInviteToken({
       inviteId: invitation.id,
+      inviteeEmail: invitation.email,
       expiresAt: invitation.expires_at,
     })
     const inviteUrl = `${resolveAppOrigin(request)}/groups/accept-invite?token=${encodeURIComponent(inviteToken)}`

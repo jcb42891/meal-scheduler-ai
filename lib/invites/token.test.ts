@@ -1,7 +1,9 @@
+import crypto from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createSignedInviteToken, verifySignedInviteToken } from './token'
 
 const INVITE_ID = '11111111-1111-4111-8111-111111111111'
+const INVITEE_EMAIL = 'invitee@example.com'
 const SECRET = 'this-is-a-very-long-secret-key-for-tests'
 
 describe('invite token signing', () => {
@@ -20,6 +22,7 @@ describe('invite token signing', () => {
   it('creates a token that verifies successfully', () => {
     const token = createSignedInviteToken({
       inviteId: INVITE_ID,
+      inviteeEmail: INVITEE_EMAIL,
       expiresAt: '2030-01-01T00:00:00.000Z',
     })
 
@@ -28,7 +31,10 @@ describe('invite token signing', () => {
     expect(result.valid).toBe(true)
     if (result.valid) {
       expect(result.claims.inviteId).toBe(INVITE_ID)
-      expect(result.claims.v).toBe(1)
+      expect(result.claims.v).toBe(2)
+      expect(result.claims).toMatchObject({
+        inviteeEmail: INVITEE_EMAIL,
+      })
     }
   })
 
@@ -38,6 +44,7 @@ describe('invite token signing', () => {
 
     const token = createSignedInviteToken({
       inviteId: INVITE_ID,
+      inviteeEmail: INVITEE_EMAIL,
       expiresAt: null,
     })
 
@@ -56,6 +63,7 @@ describe('invite token signing', () => {
   it('rejects tampered signatures', () => {
     const token = createSignedInviteToken({
       inviteId: INVITE_ID,
+      inviteeEmail: INVITEE_EMAIL,
       expiresAt: '2030-01-01T00:00:00.000Z',
     })
 
@@ -71,6 +79,7 @@ describe('invite token signing', () => {
 
     const token = createSignedInviteToken({
       inviteId: INVITE_ID,
+      inviteeEmail: INVITEE_EMAIL,
       expiresAt: '2025-01-01T00:00:05.000Z',
     })
 
@@ -81,12 +90,35 @@ describe('invite token signing', () => {
     expect(result).toEqual({ valid: false, reason: 'Token has expired.' })
   })
 
+  it('accepts legacy v1 tokens without invitee email', () => {
+    const payloadSegment = Buffer.from(
+      JSON.stringify({
+        v: 1,
+        inviteId: INVITE_ID,
+        exp: Math.floor(Date.now() / 1000) + 60,
+      }),
+      'utf8',
+    ).toString('base64url')
+    const signature = crypto.createHmac('sha256', SECRET).update(payloadSegment).digest('base64url')
+
+    const result = verifySignedInviteToken(`${payloadSegment}.${signature}`)
+
+    expect(result.valid).toBe(true)
+    if (result.valid) {
+      expect(result.claims).toMatchObject({
+        v: 1,
+        inviteId: INVITE_ID,
+      })
+    }
+  })
+
   it('throws when invite secret is missing or too short', () => {
     process.env.INVITE_TOKEN_SECRET = 'too-short'
 
     expect(() =>
       createSignedInviteToken({
         inviteId: INVITE_ID,
+        inviteeEmail: INVITEE_EMAIL,
         expiresAt: '2030-01-01T00:00:00.000Z',
       }),
     ).toThrow('INVITE_TOKEN_SECRET must be set and at least 32 characters long.')

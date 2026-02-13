@@ -221,6 +221,11 @@ describe('POST /api/groups/invitations', () => {
         inviterEmail: 'owner@example.com',
       }),
     )
+    expect(createSignedInviteTokenMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inviteeEmail: 'invitee@example.com',
+      }),
+    )
     expect(response.status).toBe(201)
     expect(json).toMatchObject({
       inviteUrl: 'https://app.example.com/groups/accept-invite?token=invite-token',

@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
     const appOrigin = resolveAppOrigin(request)
     createSignedInviteToken({
       inviteId: crypto.randomUUID(),
+      inviteeEmail: normalizedInviteEmail,
       expiresAt: null,
     })
 
@@ -120,6 +121,7 @@ export async function POST(request: NextRequest) {
 
     const inviteToken = createSignedInviteToken({
       inviteId: invitation.id,
+      inviteeEmail: invitation.email,
       expiresAt: invitation.expires_at,
     })
     const inviteUrl = `${appOrigin}/groups/accept-invite?token=${encodeURIComponent(inviteToken)}`
