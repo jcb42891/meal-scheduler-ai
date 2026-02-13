@@ -69,6 +69,23 @@ function isLikelyPrivateHost(hostname: string): boolean {
   return false
 }
 
+function isRetryableBlockedStatus(status: number): boolean {
+  return [401, 403, 429].includes(status)
+}
+
+function buildAlternateUrlCandidates(parsedUrl: URL): string[] {
+  const hostname = parsedUrl.hostname.toLowerCase()
+  const isFoodNetwork = hostname === 'foodnetwork.com' || hostname.endsWith('.foodnetwork.com')
+  if (!isFoodNetwork) return []
+
+  const pathname = parsedUrl.pathname.replace(/\/+$/, '')
+  if (!pathname || pathname.endsWith('.amp')) return []
+
+  const ampUrl = new URL(parsedUrl.toString())
+  ampUrl.pathname = `${pathname}.amp`
+  return [ampUrl.toString()]
+}
+
 function decodeHtmlEntities(value: string): string {
   return value.replace(HTML_ENTITY_PATTERN, (entity) => {
     switch (entity) {
@@ -257,38 +274,56 @@ export async function fetchRecipeTextFromUrl(inputUrl: string): Promise<UrlExtra
         Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
       },
     ]
+    const urlCandidates = [parsedUrl.toString(), ...buildAlternateUrlCandidates(parsedUrl)]
 
     let response: Response | null = null
     let html = ''
+    let lastBlockedHtml = ''
     let retriedAfterBlockedHtml = false
+    let fetchedUrl = parsedUrl.toString()
+    let sawBlockedSignal = false
 
-    for (const [attemptIndex, headers] of fetchAttempts.entries()) {
-      const attemptResponse = await fetch(parsedUrl.toString(), {
-        method: 'GET',
-        headers,
-        signal: controller.signal,
-      })
-      response = attemptResponse
+    for (const candidateUrl of urlCandidates) {
+      fetchedUrl = candidateUrl
 
-      if (!attemptResponse.ok) {
-        if (![401, 403, 429].includes(attemptResponse.status)) break
-        continue
+      for (const [attemptIndex, headers] of fetchAttempts.entries()) {
+        const attemptResponse = await fetch(candidateUrl, {
+          method: 'GET',
+          headers,
+          signal: controller.signal,
+        })
+        response = attemptResponse
+
+        if (!attemptResponse.ok) {
+          if (isRetryableBlockedStatus(attemptResponse.status)) {
+            sawBlockedSignal = true
+            continue
+          }
+          break
+        }
+
+        const attemptHtml = await attemptResponse.text()
+        const hasAnotherAttempt = attemptIndex < fetchAttempts.length - 1
+
+        if (isLikelyBlockedHtml(attemptHtml)) {
+          sawBlockedSignal = true
+          lastBlockedHtml = attemptHtml
+          if (hasAnotherAttempt) {
+            retriedAfterBlockedHtml = true
+            continue
+          }
+          break
+        }
+
+        html = attemptHtml
+        break
       }
 
-      const attemptHtml = await attemptResponse.text()
-      const hasAnotherAttempt = attemptIndex < fetchAttempts.length - 1
-
-      if (hasAnotherAttempt && isLikelyBlockedHtml(attemptHtml)) {
-        retriedAfterBlockedHtml = true
-        continue
-      }
-
-      html = attemptHtml
-      break
+      if (html) break
     }
 
     if (!response || !response.ok) {
-      if (response?.status && [401, 403, 429].includes(response.status)) {
+      if (response?.status && isRetryableBlockedStatus(response.status)) {
         throw new Error(
           `This recipe site blocked automated access (status ${response.status}). Try Screenshot or Raw Text import for this recipe.`,
         )
@@ -297,7 +332,7 @@ export async function fetchRecipeTextFromUrl(inputUrl: string): Promise<UrlExtra
     }
 
     if (!html) {
-      html = await response.text()
+      html = lastBlockedHtml || (await response.text())
     }
 
     if (isLikelyBlockedHtml(html)) {
@@ -308,6 +343,9 @@ export async function fetchRecipeTextFromUrl(inputUrl: string): Promise<UrlExtra
 
     if (retriedAfterBlockedHtml) {
       warnings.push('Initial fetch returned an access-challenge page. Retried with alternate request headers.')
+    }
+    if (sawBlockedSignal && fetchedUrl !== parsedUrl.toString()) {
+      warnings.push('Primary recipe URL was blocked. Fetched an alternate recipe page format instead.')
     }
 
     const contentType = response.headers.get('content-type')?.toLowerCase() || ''

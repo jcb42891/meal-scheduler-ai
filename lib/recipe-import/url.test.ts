@@ -171,11 +171,63 @@ describe('fetchRecipeTextFromUrl', () => {
 
     await expect(
       fetchRecipeTextFromUrl(
-        'https://www.foodnetwork.com/recipes/ina-garten/seared-salmon-with-spicy-red-pepper-aioli-11887233',
+        'https://example.com/blocked-challenge',
       ),
     ).rejects.toThrow(
       'This recipe site blocked automated access (challenge page). Try Screenshot or Raw Text import for this recipe.',
     )
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('falls back to Food Network .amp URL when primary URL is blocked', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('blocked', { status: 403 }))
+      .mockResolvedValueOnce(new Response('blocked-again', { status: 403 }))
+      .mockResolvedValueOnce(
+        new Response(
+          `
+          <html>
+            <head>
+              <script type="application/ld+json">
+                {
+                  "@context":"https://schema.org",
+                  "@type":"Recipe",
+                  "name":"Seared Salmon with Spicy Red Pepper Aioli",
+                  "recipeIngredient":["4 salmon fillets","1 cup mayonnaise"],
+                  "recipeInstructions":[{"@type":"HowToStep","text":"Preheat oven."}]
+                }
+              </script>
+            </head>
+          </html>
+          `,
+          {
+            status: 200,
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchRecipeTextFromUrl(
+      'https://www.foodnetwork.com/recipes/ina-garten/seared-salmon-with-spicy-red-pepper-aioli-11887233',
+    )
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(result.text).toContain('Recipe: Seared Salmon with Spicy Red Pepper Aioli')
+    expect(result.warnings).toContain(
+      'Primary recipe URL was blocked. Fetched an alternate recipe page format instead.',
+    )
+
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]))
+    expect(calledUrls[0]).toBe(
+      'https://www.foodnetwork.com/recipes/ina-garten/seared-salmon-with-spicy-red-pepper-aioli-11887233',
+    )
+    expect(calledUrls[1]).toBe(
+      'https://www.foodnetwork.com/recipes/ina-garten/seared-salmon-with-spicy-red-pepper-aioli-11887233',
+    )
+    expect(calledUrls[2]).toBe(
+      'https://www.foodnetwork.com/recipes/ina-garten/seared-salmon-with-spicy-red-pepper-aioli-11887233.amp',
+    )
   })
 })
