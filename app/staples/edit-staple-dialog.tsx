@@ -123,7 +123,7 @@ export function EditStapleDialog({ open, onOpenChange, staple, onStapleUpdated }
                 id="edit-staple-unit"
                 value={unit}
                 onChange={(e) => setUnit(e.target.value as StapleUnit)}
-                className="h-10 w-full rounded-[10px] border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                className="box-border h-10 w-full appearance-none rounded-[10px] border border-solid border-input bg-card px-3 text-sm shadow-sm [background-clip:padding-box] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
               >
                 {STAPLE_UNITS.map((option) => (
                   <option key={option} value={option}>
@@ -147,3 +147,4 @@ export function EditStapleDialog({ open, onOpenChange, staple, onStapleUpdated }
     </Dialog>
   )
 }
+

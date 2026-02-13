@@ -414,7 +414,7 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto pr-2">
+        <div className="flex-1 overflow-y-auto overflow-x-visible px-1">
           {step === 'input' ? (
             <div className="space-y-4">
               <Tabs value={sourceType} onValueChange={(value) => setSourceType(value as 'image' | 'url' | 'text')}>
@@ -647,7 +647,7 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
                               next[index].unit = event.target.value
                               setEditableIngredients(next)
                             }}
-                            className="h-10 w-full rounded-[10px] border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                            className="box-border h-10 w-full appearance-none rounded-[10px] border border-solid border-input bg-card px-3 text-sm shadow-sm [background-clip:padding-box] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
                           >
                             {ALLOWED_UNITS.map((unit) => (
                               <option key={unit.value} value={unit.value}>
@@ -707,3 +707,4 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
     </Dialog>
   )
 }
+

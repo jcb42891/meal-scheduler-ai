@@ -310,7 +310,7 @@ export default function MealsPage() {
           <select
             value={selectedGroupId}
             onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background sm:w-[260px]"
+            className="box-border h-10 w-full appearance-none rounded-md border border-solid border-input bg-card px-3 text-sm shadow-sm [background-clip:padding-box] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background sm:w-[260px]"
           >
             <option value="">Select a group</option>
             {userGroups.map((group) => (
@@ -645,3 +645,4 @@ export default function MealsPage() {
     </div>
   )
 }
+
