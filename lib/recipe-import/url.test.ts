@@ -92,4 +92,90 @@ describe('fetchRecipeTextFromUrl', () => {
     )
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
+
+  it('retries when the first successful response is an access-challenge HTML page', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          `
+          <html>
+            <head><title>Access Denied</title></head>
+            <body>You don't have permission to access this page.</body>
+          </html>
+          `,
+          {
+            status: 200,
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          `
+          <html>
+            <head>
+              <script type="application/ld+json">
+                {
+                  "@context":"https://schema.org",
+                  "@type":"Recipe",
+                  "name":"Seared Salmon with Spicy Red Pepper Aioli",
+                  "recipeIngredient":["4 salmon fillets","1 cup mayonnaise"],
+                  "recipeInstructions":[{"@type":"HowToStep","text":"Preheat oven."}]
+                }
+              </script>
+            </head>
+          </html>
+          `,
+          {
+            status: 200,
+            headers: { 'content-type': 'text/html; charset=utf-8' },
+          },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchRecipeTextFromUrl(
+      'https://www.foodnetwork.com/recipes/ina-garten/seared-salmon-with-spicy-red-pepper-aioli-11887233',
+    )
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(result.text).toContain('Recipe: Seared Salmon with Spicy Red Pepper Aioli')
+    expect(result.warnings).toContain(
+      'Initial fetch returned an access-challenge page. Retried with alternate request headers.',
+    )
+  })
+
+  it('throws a clear error when every successful response is an access-challenge page', async () => {
+    const blockedHtml = `
+      <html>
+        <head><title>Access Denied</title></head>
+        <body>You don't have permission to access this page.</body>
+      </html>
+    `
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(blockedHtml, {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(blockedHtml, {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        }),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      fetchRecipeTextFromUrl(
+        'https://www.foodnetwork.com/recipes/ina-garten/seared-salmon-with-spicy-red-pepper-aioli-11887233',
+      ),
+    ).rejects.toThrow(
+      'This recipe site blocked automated access (challenge page). Try Screenshot or Raw Text import for this recipe.',
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
 })

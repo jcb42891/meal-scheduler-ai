@@ -4,6 +4,15 @@ const REQUEST_TIMEOUT_MS = 10_000
 
 const SCRIPT_TAG_PATTERN = /<script([^>]*)>([\s\S]*?)<\/script>/gi
 const HTML_ENTITY_PATTERN = /&(?:amp|lt|gt|quot|#39|apos);/g
+const BLOCKED_HTML_MARKERS = [
+  '<title>access denied',
+  '<h1>access denied',
+  "you don't have permission to access",
+  'verify you are human',
+  'request blocked',
+  'bot detection',
+  'captcha',
+]
 
 const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
@@ -78,6 +87,11 @@ function decodeHtmlEntities(value: string): string {
         return entity
     }
   })
+}
+
+function isLikelyBlockedHtml(html: string): boolean {
+  const sample = html.slice(0, 8_000).toLowerCase()
+  return BLOCKED_HTML_MARKERS.some((marker) => sample.includes(marker))
 }
 
 function flattenRecipeCandidate(value: unknown): Record<string, unknown>[] {
@@ -245,15 +259,32 @@ export async function fetchRecipeTextFromUrl(inputUrl: string): Promise<UrlExtra
     ]
 
     let response: Response | null = null
-    for (const headers of fetchAttempts) {
-      response = await fetch(parsedUrl.toString(), {
+    let html = ''
+    let retriedAfterBlockedHtml = false
+
+    for (const [attemptIndex, headers] of fetchAttempts.entries()) {
+      const attemptResponse = await fetch(parsedUrl.toString(), {
         method: 'GET',
         headers,
         signal: controller.signal,
       })
+      response = attemptResponse
 
-      if (response.ok) break
-      if (![401, 403, 429].includes(response.status)) break
+      if (!attemptResponse.ok) {
+        if (![401, 403, 429].includes(attemptResponse.status)) break
+        continue
+      }
+
+      const attemptHtml = await attemptResponse.text()
+      const hasAnotherAttempt = attemptIndex < fetchAttempts.length - 1
+
+      if (hasAnotherAttempt && isLikelyBlockedHtml(attemptHtml)) {
+        retriedAfterBlockedHtml = true
+        continue
+      }
+
+      html = attemptHtml
+      break
     }
 
     if (!response || !response.ok) {
@@ -265,12 +296,25 @@ export async function fetchRecipeTextFromUrl(inputUrl: string): Promise<UrlExtra
       throw new Error(`Failed to fetch recipe URL (status ${response?.status ?? 'unknown'}).`)
     }
 
+    if (!html) {
+      html = await response.text()
+    }
+
+    if (isLikelyBlockedHtml(html)) {
+      throw new Error(
+        'This recipe site blocked automated access (challenge page). Try Screenshot or Raw Text import for this recipe.',
+      )
+    }
+
+    if (retriedAfterBlockedHtml) {
+      warnings.push('Initial fetch returned an access-challenge page. Retried with alternate request headers.')
+    }
+
     const contentType = response.headers.get('content-type')?.toLowerCase() || ''
     if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
       warnings.push('Fetched URL was not marked as HTML. AI parsing may be less reliable.')
     }
 
-    let html = await response.text()
     if (html.length > MAX_HTML_CHARS) {
       html = html.slice(0, MAX_HTML_CHARS)
       warnings.push('Recipe page response was truncated before processing.')
