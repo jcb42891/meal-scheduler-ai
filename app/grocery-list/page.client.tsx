@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Chip } from '@/components/ui/chip'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { Copy, Download } from 'lucide-react'
+import { Copy, Download, Mail } from 'lucide-react'
 
 type IngredientTotal = {
   key: string
@@ -51,6 +51,32 @@ const STEP_LABELS = ['Meal ingredients', 'Staple ingredients', 'Final list'] as 
 const makeKey = (name: string, unit: string) =>
   `${name.trim().toLowerCase()}|${unit.trim().toLowerCase()}`
 
+const QUARTER_FRACTIONS: Record<number, string> = {
+  1: '1/4',
+  2: '1/2',
+  3: '3/4',
+}
+
+const formatQuantityToQuarter = (quantity: number) => {
+  if (!Number.isFinite(quantity)) return '0'
+
+  const quarterUnits = Math.round(quantity * 4)
+  const sign = quarterUnits < 0 ? '-' : ''
+  const absoluteQuarterUnits = Math.abs(quarterUnits)
+  const whole = Math.floor(absoluteQuarterUnits / 4)
+  const remainder = absoluteQuarterUnits % 4
+
+  if (remainder === 0) {
+    return `${sign}${whole}`
+  }
+
+  const fraction = QUARTER_FRACTIONS[remainder]
+  return whole === 0 ? `${sign}${fraction}` : `${sign}${whole} ${fraction}`
+}
+
+const formatQuantityWithUnit = (quantity: number, unit: string) =>
+  `${formatQuantityToQuarter(quantity)} ${unit || 'unit'}`
+
 export function GroceryListClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -61,6 +87,7 @@ export function GroceryListClient() {
   const [selectedStapleKeys, setSelectedStapleKeys] = useState<Set<string>>(new Set())
   const [loadingMeals, setLoadingMeals] = useState(true)
   const [loadingStaples, setLoadingStaples] = useState(true)
+  const [isSendingEmail, setIsSendingEmail] = useState(false)
 
   const source = searchParams.get('source') === 'meals' ? 'meals' : 'calendar'
   const groupId = searchParams.get('groupId') || ''
@@ -260,13 +287,57 @@ export function GroceryListClient() {
   }
 
   const copyToClipboard = () => {
-    const text = combinedItems.map((item) => `${item.name}: ${item.total}`).join('\n')
+    const text = combinedItems
+      .map((item) => `${item.name}: ${formatQuantityWithUnit(item.total, item.unit)}`)
+      .join('\n')
     navigator.clipboard.writeText(text)
     toast.success('Copied to clipboard')
   }
 
   const handlePrint = () => {
     window.print()
+  }
+
+  const emailToSelf = async () => {
+    if (combinedItems.length === 0) {
+      toast.error('No grocery list items to email.')
+      return
+    }
+
+    setIsSendingEmail(true)
+    try {
+      const response = await fetch('/api/grocery-list/email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          listContextLabel,
+          items: combinedItems.map(({ name, total, unit }) => ({ name, total, unit })),
+        }),
+      })
+
+      let payload: { error?: string } | null = null
+      try {
+        payload = (await response.json()) as { error?: string }
+      } catch {
+        payload = null
+      }
+
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to send grocery list email.')
+      }
+
+      toast.success('Grocery list email sent.')
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : 'Failed to send grocery list email.'
+      toast.error(message)
+    } finally {
+      setIsSendingEmail(false)
+    }
   }
 
   return (
@@ -303,7 +374,7 @@ export function GroceryListClient() {
             <p className="text-sm text-muted-foreground">
               {step === 0 && 'Review meal ingredients and uncheck anything you already have.'}
               {step === 1 && 'Select any staple ingredients that you need.'}
-              {step === 2 && 'Your final list is ready to copy or download.'}
+              {step === 2 && 'Your final list is ready to copy, download, or email.'}
             </p>
           </CardHeader>
           <CardContent>
@@ -334,7 +405,7 @@ export function GroceryListClient() {
                           <span className="text-sm font-medium">{item.name}</span>
                         </div>
                         <span className="inline-flex min-w-9 items-center justify-center rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
-                          {item.total}
+                          {formatQuantityWithUnit(item.total, item.unit)}
                         </span>
                       </label>
                     ))}
@@ -367,7 +438,7 @@ export function GroceryListClient() {
                           {item.category && <Chip className="text-xs">{item.category}</Chip>}
                         </div>
                         <span className="inline-flex min-w-9 items-center justify-center rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
-                          {item.total}
+                          {formatQuantityWithUnit(item.total, item.unit)}
                         </span>
                       </label>
                     ))}
@@ -391,6 +462,10 @@ export function GroceryListClient() {
                         <Download className="h-4 w-4 mr-2" />
                         Download PDF
                       </Button>
+                      <Button onClick={emailToSelf} variant="outline" disabled={isSendingEmail}>
+                        <Mail className="h-4 w-4 mr-2" />
+                        {isSendingEmail ? 'Sending...' : 'Email to Yourself'}
+                      </Button>
                     </div>
                     <div className="space-y-2">
                       {combinedItems.map((item) => (
@@ -400,7 +475,7 @@ export function GroceryListClient() {
                         >
                           <span className="text-sm font-medium">{item.name}</span>
                           <span className="inline-flex min-w-9 items-center justify-center rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
-                            {item.total}
+                            {formatQuantityWithUnit(item.total, item.unit)}
                           </span>
                         </div>
                       ))}

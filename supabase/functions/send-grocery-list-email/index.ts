@@ -12,12 +12,16 @@ declare const Deno: {
   serve(handler: (request: Request) => Response | Promise<Response>): void
 }
 
-type InviteEmailPayload = {
+type GroceryListEmailItem = {
+  name: string
+  total: number
+  unit: string
+}
+
+type GroceryListEmailPayload = {
   toEmail?: string
-  groupName?: string
-  inviterEmail?: string
-  inviteUrl?: string
-  expiresAt?: string
+  listContextLabel?: string
+  items?: GroceryListEmailItem[]
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>) {
@@ -47,13 +51,12 @@ function escapeHtml(value: string) {
     .replaceAll("'", '&#39;')
 }
 
-function toDisplayDate(value: string) {
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) {
-    return 'soon'
-  }
-
-  return parsed.toUTCString()
+function isValidItem(item: GroceryListEmailItem) {
+  if (!item || typeof item !== 'object') return false
+  if (typeof item.name !== 'string' || item.name.trim().length === 0 || item.name.trim().length > 120) return false
+  if (typeof item.total !== 'number' || !Number.isFinite(item.total) || item.total < 0) return false
+  if (typeof item.unit !== 'string' || item.unit.trim().length > 40) return false
+  return true
 }
 
 Deno.serve(async (request: Request) => {
@@ -75,33 +78,31 @@ Deno.serve(async (request: Request) => {
     return jsonResponse(401, { error: 'Unauthorized.' })
   }
 
-  let payload: InviteEmailPayload
+  let payload: GroceryListEmailPayload
   try {
-    payload = (await request.json()) as InviteEmailPayload
+    payload = (await request.json()) as GroceryListEmailPayload
   } catch {
     return jsonResponse(400, { error: 'Invalid JSON payload.' })
   }
 
   const toEmail = normalizeEmail(payload.toEmail ?? '')
-  const inviterEmail = normalizeEmail(payload.inviterEmail ?? '')
-  const groupName = (payload.groupName ?? '').trim()
-  const inviteUrl = (payload.inviteUrl ?? '').trim()
-  const expiresAt = (payload.expiresAt ?? '').trim()
+  const listContextLabel = (payload.listContextLabel ?? '').trim()
+  const items = payload.items ?? []
 
   if (!isValidEmail(toEmail)) {
     return jsonResponse(400, { error: 'A valid recipient email is required.' })
   }
 
-  if (!groupName) {
-    return jsonResponse(400, { error: 'groupName is required.' })
+  if (!listContextLabel || listContextLabel.length > 120) {
+    return jsonResponse(400, { error: 'listContextLabel is required and must be 120 characters or fewer.' })
   }
 
-  if (!inviteUrl || !inviteUrl.startsWith('http')) {
-    return jsonResponse(400, { error: 'A valid inviteUrl is required.' })
+  if (!Array.isArray(items) || items.length === 0 || items.length > 300) {
+    return jsonResponse(400, { error: 'items must be a non-empty array with at most 300 entries.' })
   }
 
-  if (!expiresAt) {
-    return jsonResponse(400, { error: 'expiresAt is required.' })
+  if (!items.every(isValidItem)) {
+    return jsonResponse(400, { error: 'One or more grocery list items are invalid.' })
   }
 
   const resendApiKey = Deno.env.get('RESEND_API_KEY')
@@ -112,30 +113,22 @@ Deno.serve(async (request: Request) => {
     return jsonResponse(500, { error: 'RESEND_API_KEY and INVITE_FROM_EMAIL must be configured.' })
   }
 
-  const safeGroupName = escapeHtml(groupName)
-  const safeInviterEmail = escapeHtml(inviterEmail || 'A group admin')
-  const safeInviteUrl = escapeHtml(inviteUrl)
-  const safeExpiryDate = escapeHtml(toDisplayDate(expiresAt))
+  const safeContext = escapeHtml(listContextLabel)
+  const lines = items.map((item) => `${item.name}: ${item.total}${item.unit ? ` ${item.unit}` : ''}`)
+  const safeRows = items
+    .map((item) => {
+      const qty = `${item.total}${item.unit ? ` ${item.unit}` : ''}`
+      return `<li style="margin: 0 0 8px;"><strong>${escapeHtml(item.name)}</strong>: ${escapeHtml(qty)}</li>`
+    })
+    .join('')
 
   const html = `
     <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.5; max-width: 560px;">
-      <h2 style="margin: 0 0 12px;">You have been invited to Pantry Planner</h2>
-      <p style="margin: 0 0 10px;">
-        <strong>${safeInviterEmail}</strong> invited you to join the group <strong>${safeGroupName}</strong>.
-      </p>
-      <p style="margin: 0 0 18px;">This link expires on <strong>${safeExpiryDate}</strong>.</p>
-      <p style="margin: 0 0 20px;">
-        <a
-          href="${safeInviteUrl}"
-          style="display: inline-block; background: #111827; color: #ffffff; text-decoration: none; padding: 10px 16px; border-radius: 8px;"
-        >
-          Accept Invitation
-        </a>
-      </p>
-      <p style="margin: 0; font-size: 13px; color: #6B7280;">
-        If the button does not work, copy this link into your browser:<br />
-        <span style="word-break: break-all;">${safeInviteUrl}</span>
-      </p>
+      <h2 style="margin: 0 0 12px;">Your Grocery List</h2>
+      <p style="margin: 0 0 10px;">Context: <strong>${safeContext}</strong></p>
+      <ul style="margin: 0; padding-left: 20px;">
+        ${safeRows}
+      </ul>
     </div>
   `
 
@@ -149,8 +142,9 @@ Deno.serve(async (request: Request) => {
       from: inviteFromEmail,
       to: [toEmail],
       reply_to: inviteReplyToEmail,
-      subject: `${groupName} invited you to Pantry Planner`,
+      subject: `Your grocery list (${listContextLabel})`,
       html,
+      text: [`Your Grocery List`, `Context: ${listContextLabel}`, '', ...lines].join('\n'),
     }),
   })
 

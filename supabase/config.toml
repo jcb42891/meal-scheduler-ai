@@ -266,6 +266,11 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/send-group-invite/index.ts"
 
+[functions.send-grocery-list-email]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/send-grocery-list-email/index.ts"
+
 [analytics]
 enabled = true
 port = 54327
