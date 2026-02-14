@@ -251,17 +251,19 @@ async function syncCreditAccountForPlan(
     groupId,
     planTier,
     monthlyCredits,
+    preserveCurrentPeriodAllocation,
   }: {
     groupId: string
     planTier: string
     monthlyCredits: number
+    preserveCurrentPeriodAllocation: boolean
   },
 ) {
   const { error } = await supabaseAdmin.rpc('sync_group_import_account_for_plan', {
     p_group_id: groupId,
     p_plan_tier: planTier,
     p_monthly_credits: monthlyCredits,
-    p_preserve_current_period_allocation: true,
+    p_preserve_current_period_allocation: preserveCurrentPeriodAllocation,
   })
 
   if (error) {
@@ -343,6 +345,7 @@ export async function syncGroupSubscriptionFromStripe(
     groupId,
     planTier: applyPaidPlan ? inferredPlanCode : 'free',
     monthlyCredits: applyPaidPlan ? plan.monthly_credits : getFreeMonthlyCredits(),
+    preserveCurrentPeriodAllocation: applyPaidPlan,
   })
 }
 

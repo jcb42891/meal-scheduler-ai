@@ -1,16 +1,18 @@
 'use client'
 
 import { useAuth } from '@/lib/contexts/AuthContext'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { supabase } from '@/lib/supabase'
 import { buildClientAppUrl } from '@/lib/client-app-url'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/page-header'
-import { Loader2 } from 'lucide-react'
+import { ArrowUpRight, CreditCard, Loader2, Sparkles, UserCircle2, Users } from 'lucide-react'
 import { getMagicImportBillingCtas } from '@/app/meals/magic-import-billing-cta'
 import { readStoredBillingGroupId, writeStoredBillingGroupId } from '@/lib/billing/client'
 
@@ -47,9 +49,12 @@ type BillingStatusResponse = {
   }
 }
 
+type ProfileTab = 'billing' | 'account'
+
 export default function ProfilePage() {
   const { user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [profile, setProfile] = useState<Profile>({ first_name: '', last_name: '' })
   const [isEditing, setIsEditing] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
@@ -62,8 +67,31 @@ export default function ProfilePage() {
   const [isBillingStatusLoading, setIsBillingStatusLoading] = useState(false)
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false)
   const [isPortalLoading, setIsPortalLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<ProfileTab>('billing')
 
   const billingCtas = useMemo(() => getMagicImportBillingCtas(billingStatus), [billingStatus])
+  const selectedGroup = useMemo(
+    () => userGroups.find((group) => group.id === selectedBillingGroupId) ?? null,
+    [selectedBillingGroupId, userGroups],
+  )
+  const creditsUsedPercent = billingStatus?.monthlyCredits
+    ? Math.min(100, Math.max(0, (billingStatus.usedCredits / billingStatus.monthlyCredits) * 100))
+    : 0
+  const planLabel = billingStatus?.hasActiveSubscription ? 'Pro' : 'Free'
+
+  useEffect(() => {
+    const queryTab = searchParams.get('tab')
+    if (queryTab === 'billing' || queryTab === 'account') {
+      setActiveTab(queryTab)
+      return
+    }
+
+    if (typeof window === 'undefined') return
+    const hashTab = window.location.hash.replace('#', '')
+    if (hashTab === 'billing' || hashTab === 'account') {
+      setActiveTab(hashTab)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (!user) {
@@ -229,8 +257,7 @@ export default function ProfilePage() {
     }
   }
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleUpdateProfile = async () => {
     setIsUpdating(true)
 
     try {
@@ -269,163 +296,280 @@ export default function ProfilePage() {
     <div className="space-y-5">
       <PageHeader
         title="Profile"
-        description="Manage your account details and password settings."
+        description="Manage billing, credits, and your account details."
       />
-      
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
-          <h2 className="text-lg sm:text-xl font-semibold">Account Details</h2>
-          <div className="flex flex-col sm:flex-row w-full sm:w-auto gap-2">
-            {!isEditing && (
-              <>
-                <Button 
-                  variant="outline" 
-                  onClick={handleResetPassword}
-                  disabled={isResetting}
-                  className="w-full sm:w-auto"
-                >
-                  {isResetting ? 'Sending...' : 'Reset Password'}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsEditing(true)}
-                  className="w-full sm:w-auto"
-                >
-                  Edit Profile
-                </Button>
-              </>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-muted-foreground">Email</label>
-            <p className="break-all text-foreground">{user?.email}</p>
-          </div>
 
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">First Name</label>
-              {isEditing ? (
-                <Input
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="mt-1 w-full"
-                />
-              ) : (
-                <p className="text-foreground">{profile.first_name || '-'}</p>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-muted-foreground">Last Name</label>
-              {isEditing ? (
-                <Input
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="mt-1 w-full"
-                />
-              ) : (
-                <p className="text-foreground">{profile.last_name || '-'}</p>
-              )}
-            </div>
-
-            {isEditing && (
-              <div className="flex flex-col sm:flex-row gap-2 sm:justify-end pt-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsEditing(false)}
-                  className="w-full sm:w-auto"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleUpdateProfile} 
-                  disabled={isUpdating}
-                  className="w-full sm:w-auto"
-                >
-                  {isUpdating ? 'Updating...' : 'Update Profile'}
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card id="billing">
-        <CardHeader className="space-y-3">
-          <div>
-            <h2 className="text-lg sm:text-xl font-semibold">Billing & Magic Import Credits</h2>
-            <p className="text-sm text-muted-foreground">Upgrade to Pro or manage credits for any group you belong to.</p>
-          </div>
-          <select
-            value={selectedBillingGroupId}
-            onChange={(event) => handleBillingGroupChange(event.target.value)}
-            className="box-border h-10 w-full appearance-none rounded-md border border-solid border-input bg-card px-3 text-sm shadow-sm [background-clip:padding-box] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background sm:max-w-xs"
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ProfileTab)} className="space-y-4">
+        <TabsList className="h-auto w-full justify-start gap-1 rounded-full border border-border/70 bg-card/80 p-1">
+          <TabsTrigger
+            value="billing"
+            className="h-9 rounded-full px-4 data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white"
           >
-            <option value="">Select a group</option>
-            {userGroups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!selectedBillingGroupId ? (
-            <p className="text-sm text-muted-foreground">Select a group to view billing details.</p>
-          ) : isBillingStatusLoading ? (
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading billing status...
-            </p>
-          ) : billingStatus ? (
-            <>
-              <div className="rounded-[10px] border border-border/60 bg-surface-2/40 p-3 text-sm">
-                <p className="font-medium">
-                  {billingStatus.remainingCredits} of {billingStatus.monthlyCredits} credits left this month
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Plan: {billingStatus.planTier}
-                  {billingStatus.graceActive ? ' (grace window active)' : ''}
-                </p>
+            <CreditCard className="h-4 w-4" aria-hidden="true" />
+            Billing & Credits
+          </TabsTrigger>
+          <TabsTrigger value="account" className="h-9 rounded-full px-4">
+            <UserCircle2 className="h-4 w-4" aria-hidden="true" />
+            Account Details
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="billing" id="billing" className="space-y-4">
+          <Card className="overflow-hidden border-amber-200/70 bg-gradient-to-br from-amber-100/85 via-orange-100/85 to-rose-100/85">
+            <CardContent className="p-5 sm:p-6">
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] lg:items-end">
+                <div className="space-y-3">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/80 bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-900">
+                    <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                    Billing Command Center
+                  </span>
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-semibold text-amber-950 sm:text-2xl">Keep recipe magic flowing</h2>
+                    <p className="text-sm text-amber-900/80">
+                      Pick a group, track monthly credits, and upgrade in one place.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs font-semibold text-amber-900/85">
+                    <span className="rounded-full border border-amber-300/70 bg-white/75 px-2.5 py-1">
+                      <Users className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
+                      Group: {selectedGroup?.name ?? 'Not selected'}
+                    </span>
+                    <span className="rounded-full border border-amber-300/70 bg-white/75 px-2.5 py-1">Plan: {planLabel}</span>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-amber-300/70 bg-white/80 p-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-800/80">Credits Remaining</p>
+                  <p className="mt-1 text-3xl font-semibold leading-none text-amber-950">
+                    {isBillingStatusLoading ? '--' : billingStatus ? billingStatus.remainingCredits : '--'}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-900/80">
+                    {billingStatus ? `of ${billingStatus.monthlyCredits} monthly credits` : 'Select a group to load usage'}
+                  </p>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-amber-900/20">
+                    <span
+                      className="block h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-500"
+                      style={{ width: `${billingStatus ? 100 - creditsUsedPercent : 0}%` }}
+                    />
+                  </div>
+                </div>
               </div>
 
-              {!billingStatus.billing.stripeConfigured ? (
-                <p className="text-sm text-muted-foreground">Stripe billing is not configured yet.</p>
-              ) : !billingStatus.billing.canManage ? (
-                <p className="text-sm text-muted-foreground">
-                  You need group membership access to manage billing for this group.
+              <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,260px)_1fr]">
+                <div className="space-y-2">
+                  <label htmlFor="billing-group-select" className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">
+                    Billing Group
+                  </label>
+                  <select
+                    id="billing-group-select"
+                    value={selectedBillingGroupId}
+                    onChange={(event) => handleBillingGroupChange(event.target.value)}
+                    className="box-border h-10 w-full appearance-none rounded-md border border-solid border-amber-300/80 bg-white/80 px-3 text-sm shadow-sm [background-clip:padding-box] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+                  >
+                    <option value="">Select a group</option>
+                    {userGroups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {userGroups.length === 0 ? (
+                      <Button type="button" asChild>
+                        <Link href="/groups">
+                          Create Your First Group
+                          <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                        </Link>
+                      </Button>
+                    ) : isBillingStatusLoading ? (
+                      <Button type="button" variant="outline" disabled>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        Loading billing status...
+                      </Button>
+                    ) : billingStatus && billingStatus.billing.stripeConfigured && billingStatus.billing.canManage ? (
+                      <>
+                        {billingCtas.showUpgrade && (
+                          <Button
+                            type="button"
+                            onClick={() => startBillingRedirect('/api/billing/checkout')}
+                            disabled={isCheckoutLoading}
+                            className="bg-gradient-to-r from-amber-500 to-rose-500 text-white hover:brightness-105"
+                          >
+                            {isCheckoutLoading ? 'Opening Stripe...' : 'Upgrade to Pro'}
+                          </Button>
+                        )}
+                        {billingCtas.showManage && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => startBillingRedirect('/api/billing/portal')}
+                            disabled={isPortalLoading}
+                          >
+                            {isPortalLoading ? 'Opening portal...' : 'Manage Billing'}
+                          </Button>
+                        )}
+                      </>
+                    ) : null}
+                  </div>
+
+                  {userGroups.length === 0 ? (
+                    <p className="text-xs text-amber-900/80">Groups unlock shared plans, billing, and credit pools.</p>
+                  ) : billingStatus && !billingStatus.billing.stripeConfigured ? (
+                    <p className="text-xs text-amber-900/80">Stripe billing is not configured yet.</p>
+                  ) : billingStatus && !billingStatus.billing.canManage ? (
+                    <p className="text-xs text-amber-900/80">
+                      You need billing permissions in this group before opening Stripe.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="space-y-1">
+              <h3 className="text-lg font-semibold">Current Billing Snapshot</h3>
+              <p className="text-sm text-muted-foreground">Usage and plan details for your selected group.</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!selectedBillingGroupId ? (
+                <p className="text-sm text-muted-foreground">Select a group to view billing details.</p>
+              ) : isBillingStatusLoading ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading billing status...
                 </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {billingCtas.showUpgrade && (
-                    <Button
-                      type="button"
-                      onClick={() => startBillingRedirect('/api/billing/checkout')}
-                      disabled={isCheckoutLoading}
-                    >
-                      {isCheckoutLoading ? 'Opening Stripe...' : 'Upgrade to Pro'}
-                    </Button>
+              ) : billingStatus ? (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg border border-border/70 bg-card p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Plan</p>
+                      <p className="mt-1 text-lg font-semibold capitalize">{billingStatus.planTier}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-card p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Used</p>
+                      <p className="mt-1 text-lg font-semibold">{billingStatus.usedCredits}</p>
+                    </div>
+                    <div className="rounded-lg border border-border/70 bg-card p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Remaining</p>
+                      <p className="mt-1 text-lg font-semibold">{billingStatus.remainingCredits}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/70 bg-surface-2/40 p-3">
+                    <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Credit usage this month</span>
+                      <span>{Math.round(creditsUsedPercent)}% used</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-border/60">
+                      <span
+                        className="block h-full rounded-full bg-gradient-to-r from-primary to-emerald-600"
+                        style={{ width: `${creditsUsedPercent}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {billingStatus.graceActive ? 'Grace window active.' : 'Billing cycle active.'}
+                    </p>
+                  </div>
+
+                  {billingCtas.showBlockedNotice && (
+                    <p className="rounded-md border border-amber-300/70 bg-amber-100/60 px-3 py-2 text-sm text-amber-900">
+                      Magic Import is currently blocked for this group. Upgrading to Pro restores access.
+                    </p>
                   )}
-                  {billingCtas.showManage && (
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Unable to load billing status right now.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="account">
+          <Card>
+            <CardHeader className="flex flex-col items-start justify-between space-y-3 sm:flex-row sm:items-center sm:space-y-0">
+              <h2 className="text-lg font-semibold sm:text-xl">Account Details</h2>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                {!isEditing && (
+                  <>
                     <Button
-                      type="button"
                       variant="outline"
-                      onClick={() => startBillingRedirect('/api/billing/portal')}
-                      disabled={isPortalLoading}
+                      onClick={handleResetPassword}
+                      disabled={isResetting}
+                      className="w-full sm:w-auto"
                     >
-                      {isPortalLoading ? 'Opening portal...' : 'Manage / Add Credits'}
+                      {isResetting ? 'Sending...' : 'Reset Password'}
                     </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditing(true)}
+                      className="w-full sm:w-auto"
+                    >
+                      Edit Profile
+                    </Button>
+                  </>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-muted-foreground">Email</label>
+                <p className="break-all text-foreground">{user?.email}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-muted-foreground">First Name</label>
+                  {isEditing ? (
+                    <Input
+                      value={firstName}
+                      onChange={(event) => setFirstName(event.target.value)}
+                      className="mt-1 w-full"
+                    />
+                  ) : (
+                    <p className="text-foreground">{profile.first_name || '-'}</p>
                   )}
                 </div>
-              )}
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Unable to load billing status right now.</p>
-          )}
-        </CardContent>
-      </Card>
+
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-muted-foreground">Last Name</label>
+                  {isEditing ? (
+                    <Input
+                      value={lastName}
+                      onChange={(event) => setLastName(event.target.value)}
+                      className="mt-1 w-full"
+                    />
+                  ) : (
+                    <p className="text-foreground">{profile.last_name || '-'}</p>
+                  )}
+                </div>
+
+                {isEditing && (
+                  <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditing(false)}
+                      className="w-full sm:w-auto"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleUpdateProfile}
+                      disabled={isUpdating}
+                      className="w-full sm:w-auto"
+                    >
+                      {isUpdating ? 'Updating...' : 'Update Profile'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
-} 
+}

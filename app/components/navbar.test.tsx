@@ -156,7 +156,14 @@ describe('Navbar', () => {
       )
     })
 
-    expect(screen.getByRole('link', { name: '33/40 credits' })).toHaveAttribute('href', '/profile#billing')
+    const creditsLink = screen.getByRole('link', { name: '33/40 credits' })
+    expect(creditsLink).toHaveAttribute('href', '/profile?tab=billing')
+    expect(creditsLink.className).toContain('from-amber-100')
+    expect(creditsLink.className).toContain('to-rose-100')
+
+    const upgradeButton = screen.getByRole('button', { name: 'Upgrade to Pro' })
+    expect(upgradeButton.className).toContain('from-amber-500')
+    expect(upgradeButton.className).toContain('to-rose-500')
     expect(screen.getAllByRole('link', { name: 'Upgrade to Pro' }).length).toBeGreaterThan(0)
   })
 
@@ -183,8 +190,11 @@ describe('Navbar', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/billing/status?groupId=group-1&sourceType=url')
     })
 
-    expect(screen.getByRole('link', { name: 'Pro Plan' })).toHaveAttribute('href', '/profile#billing')
-    expect(screen.getByRole('link', { name: '180/200 credits' })).toHaveAttribute('href', '/profile#billing')
+    expect(screen.getByRole('link', { name: 'Pro Plan' })).toHaveAttribute('href', '/profile?tab=billing')
+    const proCreditsLink = screen.getByRole('link', { name: '180/200 credits' })
+    expect(proCreditsLink).toHaveAttribute('href', '/profile?tab=billing')
+    expect(proCreditsLink.className).toContain('from-amber-100')
+    expect(proCreditsLink.className).toContain('to-rose-100')
     expect(screen.queryByRole('link', { name: 'Upgrade to Pro' })).not.toBeInTheDocument()
   })
 
@@ -244,7 +254,7 @@ describe('Navbar', () => {
       expect(fetchMock).toHaveBeenCalledWith('/api/billing/status?groupId=group-1&sourceType=url')
     })
 
-    expect(screen.getByRole('link', { name: '33/40 credits' })).toHaveAttribute('href', '/profile#billing')
+    expect(screen.getByRole('link', { name: '33/40 credits' })).toHaveAttribute('href', '/profile?tab=billing')
     expect(screen.getAllByRole('link', { name: 'Upgrade to Pro' }).length).toBeGreaterThan(0)
   })
 

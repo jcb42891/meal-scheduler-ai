@@ -22,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Crown, LogOut, Menu } from 'lucide-react'
+import { Crown, LogOut, Menu, Sparkles, Wallet } from 'lucide-react'
 
 type Group = {
   id: string
@@ -52,9 +52,17 @@ export function Navbar() {
   const hasBillingGroups = billingGroups.length > 0
   const hasProTier =
     hasBillingGroups && (billingStatus?.planTier === 'pro' || billingStatus?.hasActiveSubscription === true)
-  const billingCtaHref = hasBillingGroups ? '/profile#billing' : '/groups'
+  const billingCtaHref = hasBillingGroups ? '/profile?tab=billing' : '/groups'
   const billingCtaLabel = hasBillingGroups ? 'Upgrade to Pro' : 'Create Group to Upgrade'
   const billingMenuLabel = hasProTier ? 'Manage Billing' : billingCtaLabel
+  const creditLabel = isBillingStatusLoading
+    ? 'Loading credits...'
+    : billingStatus
+      ? `${billingStatus.remainingCredits}/${billingStatus.monthlyCredits} credits`
+      : 'Credits unavailable'
+  const creditUsagePercent = billingStatus?.monthlyCredits
+    ? Math.min(100, Math.max(0, (billingStatus.remainingCredits / billingStatus.monthlyCredits) * 100))
+    : 0
 
   const navItems = [
     { href: '/calendar', label: 'Calendar' },
@@ -246,23 +254,30 @@ export function Navbar() {
         ) : user ? (
           <div className="flex items-center gap-2">
             {hasBillingGroups && (
-              <>
-                <Link
-                  href="/profile#billing"
-                  className="inline-flex rounded-full border border-border/70 bg-card px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-2 sm:px-3 sm:text-xs"
-                >
-                  {isBillingStatusLoading
-                    ? 'Loading credits...'
-                    : billingStatus
-                      ? `${billingStatus.remainingCredits}/${billingStatus.monthlyCredits} credits`
-                      : 'Credits unavailable'}
-                </Link>
-
-              </>
+              <Link
+                href={billingCtaHref}
+                className="group inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-gradient-to-r from-amber-100 via-orange-100 to-rose-100 px-2.5 py-1 text-[11px] font-semibold text-amber-950 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:px-3 sm:text-xs"
+              >
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-amber-700 shadow-sm">
+                  <Wallet className="h-3 w-3" aria-hidden="true" />
+                </span>
+                <span className="leading-none">{creditLabel}</span>
+                {billingStatus && !isBillingStatusLoading && (
+                  <span className="hidden items-center gap-1 sm:inline-flex">
+                    <span className="h-1.5 w-12 overflow-hidden rounded-full bg-amber-900/20">
+                      <span
+                        className="block h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-500"
+                        style={{ width: `${creditUsagePercent}%` }}
+                      />
+                    </span>
+                    <Sparkles className="h-3 w-3 text-rose-600" aria-hidden="true" />
+                  </span>
+                )}
+              </Link>
             )}
 
             {hasProTier ? (
-              <Link href="/profile#billing" className="hidden md:inline-flex">
+              <Link href={billingCtaHref} className="hidden md:inline-flex">
                 <Chip className="h-9 gap-1 border-emerald-500/30 bg-emerald-500/10 px-3 text-emerald-700">
                   <Crown className="h-3.5 w-3.5" aria-hidden="true" />
                   Pro Plan
@@ -270,7 +285,16 @@ export function Navbar() {
               </Link>
             ) : (
               <Link href={billingCtaHref} className="hidden md:inline-flex">
-                <Button variant="outline" size="sm" className="border-border/70 bg-card">
+                <Button
+                  size="sm"
+                  className={cn(
+                    'h-9 rounded-full px-4 text-xs font-semibold text-white shadow-md',
+                    hasBillingGroups
+                      ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 shadow-orange-500/35 hover:brightness-105 hover:shadow-lg hover:shadow-orange-500/40'
+                      : 'bg-gradient-to-r from-primary to-emerald-600 shadow-primary/35 hover:brightness-105 hover:shadow-lg hover:shadow-primary/40'
+                  )}
+                >
+                  {hasBillingGroups && <Crown className="h-3.5 w-3.5" aria-hidden="true" />}
                   {billingCtaLabel}
                 </Button>
               </Link>

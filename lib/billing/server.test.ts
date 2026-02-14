@@ -275,6 +275,7 @@ describe('syncGroupSubscriptionFromStripe', () => {
     expect(rpcMock).toHaveBeenCalledWith('sync_group_import_account_for_plan', expect.objectContaining({
       p_group_id: 'group-1',
       p_plan_tier: 'free',
+      p_preserve_current_period_allocation: false,
     }))
   })
 
@@ -302,6 +303,7 @@ describe('syncGroupSubscriptionFromStripe', () => {
     expect(rpcMock).toHaveBeenCalledWith('sync_group_import_account_for_plan', expect.objectContaining({
       p_group_id: 'group-1',
       p_plan_tier: 'pro',
+      p_preserve_current_period_allocation: true,
     }))
   })
 })
