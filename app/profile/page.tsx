@@ -376,7 +376,8 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">Billing Actions</p>
+                  <div className="flex min-h-10 flex-wrap items-center gap-2">
                     {userGroups.length === 0 ? (
                       <Button type="button" asChild>
                         <Link href="/groups">
@@ -396,7 +397,7 @@ export default function ProfilePage() {
                             type="button"
                             onClick={() => startBillingRedirect('/api/billing/checkout')}
                             disabled={isCheckoutLoading}
-                            className="bg-gradient-to-r from-amber-500 to-rose-500 text-white hover:brightness-105"
+                            className="h-10 bg-gradient-to-r from-amber-500 to-rose-500 text-white hover:brightness-105"
                           >
                             {isCheckoutLoading ? 'Opening Stripe...' : 'Upgrade to Pro'}
                           </Button>
