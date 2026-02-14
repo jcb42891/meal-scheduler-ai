@@ -2,7 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ImportSourceType } from './types'
 
 const DEFAULT_MONTHLY_CREDITS = 40
-const DEFAULT_CREDITS_PER_IMPORT = 1
+const DEFAULT_CREDITS_PER_TEXT_IMPORT = 1
+const DEFAULT_CREDITS_PER_URL_IMPORT = 2
+const DEFAULT_CREDITS_PER_IMAGE_IMPORT = 3
 
 type UsageEventType = 'attempt' | 'success' | 'failure'
 
@@ -50,19 +52,47 @@ export type GroupCreditConsumptionResult = {
   remainingCredits: number
 }
 
+type GroupMagicImportStatusRpcRow = {
+  allowed: boolean | null
+  reason_code: string | null
+  plan_tier: string | null
+  period_start: string | null
+  monthly_credits: number | string | null
+  used_credits: number | string | null
+  remaining_credits: number | string | null
+  required_credits: number | string | null
+  is_unlimited: boolean | null
+  has_active_subscription: boolean | null
+  grace_active: boolean | null
+}
+
+export type GroupMagicImportStatus = {
+  allowed: boolean
+  reasonCode: string | null
+  planTier: string
+  periodStart: string
+  monthlyCredits: number
+  usedCredits: number
+  remainingCredits: number
+  requiredCredits: number
+  isUnlimited: boolean
+  hasActiveSubscription: boolean
+  graceActive: boolean
+}
+
 function asInteger(value: number | string | null | undefined, fallback: number): number {
   const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : Number.NaN
   if (!Number.isFinite(parsed)) return fallback
   return Math.floor(parsed)
 }
 
-function getDefaultMonthlyCredits() {
+export function getDefaultMonthlyCredits() {
   const value = Number(process.env.RECIPE_IMPORT_MONTHLY_CREDITS ?? DEFAULT_MONTHLY_CREDITS)
   if (!Number.isFinite(value) || value < 0) return DEFAULT_MONTHLY_CREDITS
   return Math.floor(value)
 }
 
-function getSourceCreditCost(sourceType: ImportSourceType): number {
+export function getSourceCreditCost(sourceType: ImportSourceType): number {
   const envKey =
     sourceType === 'image'
       ? 'RECIPE_IMPORT_CREDITS_IMAGE'
@@ -70,8 +100,15 @@ function getSourceCreditCost(sourceType: ImportSourceType): number {
         ? 'RECIPE_IMPORT_CREDITS_URL'
         : 'RECIPE_IMPORT_CREDITS_TEXT'
 
-  const value = Number(process.env[envKey] ?? DEFAULT_CREDITS_PER_IMPORT)
-  if (!Number.isFinite(value) || value <= 0) return DEFAULT_CREDITS_PER_IMPORT
+  const defaultValue =
+    sourceType === 'image'
+      ? DEFAULT_CREDITS_PER_IMAGE_IMPORT
+      : sourceType === 'url'
+        ? DEFAULT_CREDITS_PER_URL_IMPORT
+        : DEFAULT_CREDITS_PER_TEXT_IMPORT
+
+  const value = Number(process.env[envKey] ?? defaultValue)
+  if (!Number.isFinite(value) || value <= 0) return defaultValue
   return Math.floor(value)
 }
 
@@ -162,5 +199,48 @@ export async function consumeGroupImportCredits(
     monthlyCredits: asInteger(row.monthly_credits, defaultMonthlyCredits),
     usedCredits: Math.max(0, asInteger(row.used_credits, 0)),
     remainingCredits: Math.max(0, asInteger(row.remaining_credits, 0)),
+  }
+}
+
+export async function getGroupMagicImportStatus(
+  supabase: SupabaseClient,
+  {
+    groupId,
+    sourceType,
+  }: {
+    groupId: string
+    sourceType: ImportSourceType
+  },
+): Promise<GroupMagicImportStatus> {
+  const defaultMonthlyCredits = getDefaultMonthlyCredits()
+  const requiredCredits = getSourceCreditCost(sourceType)
+  const { data, error } = await supabase.rpc('get_group_magic_import_status', {
+    p_group_id: groupId,
+    p_source_type: sourceType,
+    p_required_credits: requiredCredits,
+    p_default_monthly_credits: defaultMonthlyCredits,
+  })
+
+  if (error) {
+    throw new Error(error.message || 'Unable to read import entitlement status.')
+  }
+
+  const row = (Array.isArray(data) ? data[0] : data) as GroupMagicImportStatusRpcRow | null | undefined
+  if (!row || !row.period_start) {
+    throw new Error('Import entitlement status returned an empty response.')
+  }
+
+  return {
+    allowed: row.allowed === true,
+    reasonCode: row.reason_code?.trim() || null,
+    planTier: row.plan_tier?.trim() || 'free',
+    periodStart: row.period_start,
+    monthlyCredits: asInteger(row.monthly_credits, defaultMonthlyCredits),
+    usedCredits: Math.max(0, asInteger(row.used_credits, 0)),
+    remainingCredits: Math.max(0, asInteger(row.remaining_credits, 0)),
+    requiredCredits: Math.max(1, asInteger(row.required_credits, requiredCredits)),
+    isUnlimited: row.is_unlimited === true,
+    hasActiveSubscription: row.has_active_subscription === true,
+    graceActive: row.grace_active === true,
   }
 }

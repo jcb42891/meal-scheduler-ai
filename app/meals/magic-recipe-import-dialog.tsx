@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,8 @@ import { useAuth } from '@/lib/contexts/AuthContext'
 import { getRecipeImportParseErrorMessage, readRecipeImportErrorPayload } from '@/lib/recipe-import/client-errors'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { notifyBillingStatusUpdated } from '@/lib/billing/client'
+import { getMagicImportBillingCtas } from './magic-import-billing-cta'
 import { MEAL_CATEGORIES, MealCategory, WEEKNIGHT_FRIENDLY_LABEL, getCategoryColor, getWeeknightFriendlyColor, getWeeknightNotFriendlyColor } from './meal-utils'
 import { Loader2, Plus, Sparkles, X } from 'lucide-react'
 
@@ -49,6 +51,38 @@ type ParseResponse = {
   source?: {
     sourceType: 'image' | 'url' | 'text'
     url?: string | null
+  }
+  usage?: {
+    creditsCharged: number
+    creditsRemaining: number
+    monthlyCredits: number
+    usedCredits: number
+    periodStart: string
+    planTier: string
+  }
+}
+
+type BillingStatusResponse = {
+  planTier: string
+  allowed: boolean
+  reasonCode: string | null
+  periodStart: string
+  monthlyCredits: number
+  usedCredits: number
+  remainingCredits: number
+  requiredCredits: number
+  isUnlimited: boolean
+  hasActiveSubscription: boolean
+  graceActive: boolean
+  isEnvOverride: boolean
+  sourceCosts: {
+    text: number
+    url: number
+    image: number
+  }
+  billing: {
+    stripeConfigured: boolean
+    canManage: boolean
   }
 }
 
@@ -127,6 +161,10 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
   const [isSaving, setIsSaving] = useState(false)
   const [parseWarnings, setParseWarnings] = useState<string[]>([])
   const [parseConfidence, setParseConfidence] = useState<number | null>(null)
+  const [billingStatus, setBillingStatus] = useState<BillingStatusResponse | null>(null)
+  const [isBillingStatusLoading, setIsBillingStatusLoading] = useState(false)
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false)
+  const [isPortalLoading, setIsPortalLoading] = useState(false)
 
   const [mealName, setMealName] = useState('')
   const [description, setDescription] = useState('')
@@ -174,6 +212,10 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
     setIngredientSearchTerm('')
     setParseWarnings([])
     setParseConfidence(null)
+    setBillingStatus(null)
+    setIsBillingStatusLoading(false)
+    setIsCheckoutLoading(false)
+    setIsPortalLoading(false)
   }, [open])
 
   const parseConfidencePercent = useMemo(() => {
@@ -226,9 +268,78 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
     return true
   }
 
+  const fetchBillingStatus = useCallback(async () => {
+    if (!open || !groupId) return
+
+    setIsBillingStatusLoading(true)
+    try {
+      const query = new URLSearchParams({
+        groupId,
+        sourceType,
+      })
+      const response = await fetch(`/api/billing/status?${query.toString()}`, {
+        method: 'GET',
+      })
+
+      if (!response.ok) {
+        throw new Error('Unable to load import quota.')
+      }
+
+      const payload = (await response.json()) as BillingStatusResponse
+      setBillingStatus(payload)
+    } catch {
+      setBillingStatus(null)
+    } finally {
+      setIsBillingStatusLoading(false)
+    }
+  }, [groupId, open, sourceType])
+
+  useEffect(() => {
+    fetchBillingStatus()
+  }, [fetchBillingStatus])
+
+  const startBillingRedirect = async (path: '/api/billing/checkout' | '/api/billing/portal') => {
+    if (!groupId) return
+
+    const setLoading = path === '/api/billing/checkout' ? setIsCheckoutLoading : setIsPortalLoading
+    setLoading(true)
+    try {
+      const response = await fetch(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ groupId }),
+      })
+
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        const message =
+          payload && typeof payload.error === 'string' && payload.error.trim().length > 0
+            ? payload.error
+            : 'Unable to open billing.'
+        throw new Error(message)
+      }
+
+      const url = payload && typeof payload.url === 'string' ? payload.url : ''
+      if (!url) {
+        throw new Error('Billing redirect URL is missing.')
+      }
+
+      window.location.assign(url)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to open billing.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleParse = async () => {
     if (!groupId) {
       toast.error('Select a group before importing')
+      return
+    }
+
+    if (billingStatus && !billingStatus.allowed && !billingStatus.isUnlimited) {
+      toast.error('This group is out of Magic Import credits. Upgrade to continue importing.')
       return
     }
 
@@ -294,6 +405,22 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
       )
       setParseWarnings(data.recipe.warnings || [])
       setParseConfidence(data.recipe.confidence ?? null)
+      if (data.usage) {
+        setBillingStatus((prev) =>
+          prev
+            ? {
+                ...prev,
+                planTier: data.usage?.planTier ?? prev.planTier,
+                monthlyCredits: data.usage?.monthlyCredits ?? prev.monthlyCredits,
+                usedCredits: data.usage?.usedCredits ?? prev.usedCredits,
+                remainingCredits: data.usage?.creditsRemaining ?? prev.remainingCredits,
+              }
+            : prev,
+        )
+      } else {
+        fetchBillingStatus()
+      }
+      notifyBillingStatusUpdated(groupId)
       setStep('review')
       toast.success('Recipe parsed. Review and save your meal.')
     } catch (error) {
@@ -435,6 +562,10 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
     }
   }
 
+  const isImportBlocked = Boolean(billingStatus && !billingStatus.allowed && !billingStatus.isUnlimited)
+  const currentSourceCost = billingStatus?.sourceCosts[sourceType] ?? null
+  const billingCtas = getMagicImportBillingCtas(billingStatus)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] flex flex-col w-full max-w-3xl mx-auto">
@@ -506,6 +637,66 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
                   />
                 </TabsContent>
               </Tabs>
+
+              <div className="rounded-[10px] border border-border/60 bg-surface-2/40 p-3 text-sm">
+                {isBillingStatusLoading ? (
+                  <p className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading Magic Import credits...
+                  </p>
+                ) : billingStatus ? (
+                  <div className="space-y-2">
+                    <p className="font-medium">
+                      {billingStatus.remainingCredits} of {billingStatus.monthlyCredits} credits left this month
+                      {currentSourceCost !== null ? ` - ${currentSourceCost} credit${currentSourceCost === 1 ? '' : 's'} for this import` : ''}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Plan: {billingStatus.planTier}
+                      {billingStatus.graceActive ? ' (grace window active)' : ''}
+                    </p>
+                    {billingStatus.isEnvOverride && (
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                        Developer override active for your user. Credits are not charged while this override is enabled.
+                      </p>
+                    )}
+                    {(billingCtas.showBlockedNotice || billingCtas.showUpgrade || billingCtas.showManage) && (
+                      <div className="space-y-2 rounded-[8px] border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-950 dark:text-amber-100">
+                        {billingCtas.showBlockedNotice ? (
+                          <p>Magic Import credits are exhausted for this group.</p>
+                        ) : (
+                          <p>Upgrade to Pro for more monthly Magic Import credits.</p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          {billingCtas.showUpgrade && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => startBillingRedirect('/api/billing/checkout')}
+                              disabled={isCheckoutLoading}
+                            >
+                              {isCheckoutLoading ? 'Opening Stripe...' : 'Upgrade with Stripe'}
+                            </Button>
+                          )}
+                          {billingCtas.showManage && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => startBillingRedirect('/api/billing/portal')}
+                              disabled={isPortalLoading}
+                            >
+                              {isPortalLoading ? 'Opening portal...' : 'Manage billing'}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Unable to load Magic Import quota right now.</p>
+                )}
+              </div>
+
               <div className="rounded-[10px] border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-950 dark:text-amber-100">
                 Imported URL/text/image content is sent to an external AI provider to extract recipe fields. Do not import sensitive personal data.
               </div>
@@ -715,7 +906,11 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
             Cancel
           </Button>
           {step === 'input' ? (
-            <Button type="button" onClick={handleParse} disabled={isParsing || !groupId}>
+            <Button
+              type="button"
+              onClick={handleParse}
+              disabled={isParsing || !groupId || isImportBlocked || isBillingStatusLoading}
+            >
               {isParsing ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />

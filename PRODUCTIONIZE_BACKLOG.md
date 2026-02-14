@@ -1,7 +1,7 @@
 # Productionize + Monetization Backlog
 
 Created: February 8, 2026  
-Last Updated: February 11, 2026 (M3 complete)  
+Last Updated: February 14, 2026 (M4 complete)  
 Primary Goal: productionize Pantry Planner and ship a sustainable monetization model, starting with Magic Import.
 
 ## Status Legend
@@ -30,7 +30,7 @@ Primary Goal: productionize Pantry Planner and ship a sustainable monetization m
 | M1 | Security and data access hardening | P0 | Complete | February 2026 | RLS/policy gaps are closed and validated with access tests. |
 | M2 | Auth, routing, and invite flow reliability | P0 | Complete | February 2026 | Protected routes are fully gated and invite flow is robust/reliable. |
 | M3 | Durable usage metering and rate limiting | P0 | Complete | February to March 2026 | Import quotas and limits are persistent and enforceable across instances. |
-| M4 | Billing + entitlement system for Magic Import | P0 | Not started | March 2026 | Paid plans, webhooks, entitlements, and paywall are live end to end. |
+| M4 | Billing + entitlement system for Magic Import | P0 | Complete | March 2026 | Paid plans, webhooks, entitlements, and paywall are live end to end. |
 | M5 | Magic Import quality + margin optimization | P1 | Not started | March to April 2026 | URL deterministic parsing, model usage optimization, and parse quality metrics are in place. |
 | M6 | Core product UX/data model upgrades | P1 | Not started | April 2026 | Structured recipe data and improved grocery output are shipped. |
 | M7 | Observability, analytics, and experimentation | P1 | Not started | April 2026 | Monitoring + product funnel events + cost dashboards are live. |
@@ -67,12 +67,12 @@ Primary Goal: productionize Pantry Planner and ship a sustainable monetization m
 ### M4: Billing + Entitlements for Magic Import
 | ID | Priority | Status | Item | Dependencies | Acceptance Criteria |
 | --- | --- | --- | --- | --- | --- |
-| BILL-001 | P0 | Not started | Add billing schema (`plans`, `subscriptions`, `entitlements`, `credit_purchases`). | USG-003 | Billing state is represented in DB with clear ownership and status. |
-| BILL-002 | P0 | Not started | Integrate payment provider checkout + customer portal + webhook processing. | BILL-001 | Subscription lifecycle changes are reflected in DB automatically. |
-| BILL-003 | P0 | Not started | Enforce entitlements in `app/api/recipe-import/parse/route.ts` before parsing. | BILL-001, USG-003 | Parse route blocks over-quota users with clear error responses. |
-| BILL-004 | P0 | Not started | Add Magic Import paywall and quota UX in `app/meals/magic-recipe-import-dialog.tsx`. | BILL-003 | User sees remaining credits and upgrade path before parse attempt. |
-| BILL-005 | P1 | Not started | Implement source-type weighted credit costs (image > URL > text). | BILL-003 | Credit decrement logic matches pricing strategy and is tested. |
-| BILL-006 | P1 | Not started | Add grace/fallback handling for delayed webhooks and temporary billing sync issues. | BILL-002 | Entitlements remain safe and consistent during webhook delay/failure scenarios. |
+| BILL-001 | P0 | Complete | Add billing schema (`plans`, `subscriptions`, `entitlements`, `credit_purchases`). | USG-003 | Billing state is represented in DB with clear ownership and status. |
+| BILL-002 | P0 | Complete | Integrate payment provider checkout + customer portal + webhook processing. | BILL-001 | Subscription lifecycle changes are reflected in DB automatically. |
+| BILL-003 | P0 | Complete | Enforce entitlements in `app/api/recipe-import/parse/route.ts` before parsing. | BILL-001, USG-003 | Parse route blocks over-quota users with clear error responses. |
+| BILL-004 | P0 | Complete | Add Magic Import paywall and quota UX in `app/meals/magic-recipe-import-dialog.tsx`. | BILL-003 | User sees remaining credits and upgrade path before parse attempt. |
+| BILL-005 | P1 | Complete | Implement source-type weighted credit costs (image > URL > text). | BILL-003 | Credit decrement logic matches pricing strategy and is tested. |
+| BILL-006 | P1 | Complete | Add grace/fallback handling for delayed webhooks and temporary billing sync issues. | BILL-002 | Entitlements remain safe and consistent during webhook delay/failure scenarios. |
 
 ### M5: Magic Import Quality + Margin Optimization
 | ID | Priority | Status | Item | Dependencies | Acceptance Criteria |
@@ -148,3 +148,10 @@ Primary Goal: productionize Pantry Planner and ship a sustainable monetization m
 - 2026-02-11: USG-004 moved to `Complete` after adding admin reporting views/functions for daily usage and monthly overage analysis by source type and plan tier.
 - 2026-02-11: M3 moved to `Complete` after validating persistent rate limiting, durable usage metering, credit accounting, and reporting query availability.
 - 2026-02-11: Added follow-up migration `drizzle/0006_m3_credit_function_ambiguity_fix.sql` to resolve credit-function column ambiguity and revalidated rate-limit/quota RPC behavior.
+- 2026-02-14: BILL-001 moved to `Complete` after adding billing schema migration `drizzle/0007_m4_billing_entitlements.sql` with `plans`, `subscriptions`, `entitlements`, `credit_purchases`, and helper RPC functions for account sync/status checks.
+- 2026-02-14: BILL-002 moved to `Complete` after adding Stripe checkout/portal/webhook routes under `app/api/billing/*` and server-side Stripe subscription sync to Supabase billing state.
+- 2026-02-14: BILL-003 moved to `Complete` after enforcing entitlement checks in `app/api/recipe-import/parse/route.ts` before parsing/credit consumption, including override support.
+- 2026-02-14: BILL-004 moved to `Complete` after adding quota/paywall UX in `app/meals/magic-recipe-import-dialog.tsx` with remaining credits, source costs, and upgrade/manage billing actions.
+- 2026-02-14: BILL-005 moved to `Complete` after implementing weighted source costs defaults (image 3, URL 2, text 1) in `lib/recipe-import/usage.ts` with updated tests.
+- 2026-02-14: BILL-006 moved to `Complete` after adding grace/fallback handling via webhook grace windows and parse-time Stripe lookup resync when quota checks fail.
+- 2026-02-14: M4 moved to `Complete` after validating billing schema, Stripe lifecycle syncing, entitlement gating, paywall UX, and automated tests for updated usage/parse/error flows.

@@ -46,7 +46,7 @@ describe('getRecipeImportParseErrorMessage', () => {
         status: 500,
         code: 'quota_exceeded',
       }),
-    ).toBe('Too many recipe import attempts. Please try again shortly.')
+    ).toBe('Magic Import credits are exhausted for this group. Upgrade billing or wait for the monthly reset.')
   })
 
   it('maps timeout and unsupported source errors', () => {

@@ -1,9 +1,18 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
+import { Chip } from '@/components/ui/chip'
+import { supabase } from '@/lib/supabase'
+import {
+  BILLING_GROUP_CHANGE_EVENT,
+  BILLING_GROUPS_UPDATED_EVENT,
+  BILLING_STATUS_UPDATED_EVENT,
+  readStoredBillingGroupId,
+} from '@/lib/billing/client'
 import { cn } from '@/lib/utils'
 import {
   DropdownMenu,
@@ -13,11 +22,39 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { LogOut, Menu } from 'lucide-react'
+import { Crown, LogOut, Menu } from 'lucide-react'
+
+type Group = {
+  id: string
+  name: string
+}
+
+type MemberGroupRow = {
+  group: Group
+}
+
+type BillingStatusResponse = {
+  planTier: string
+  hasActiveSubscription: boolean
+  monthlyCredits: number
+  remainingCredits: number
+}
 
 export function Navbar() {
   const { user, signOut, loading } = useAuth()
   const pathname = usePathname()
+  const [billingGroups, setBillingGroups] = useState<Group[]>([])
+  const [activeBillingGroupId, setActiveBillingGroupId] = useState('')
+  const [billingStatus, setBillingStatus] = useState<BillingStatusResponse | null>(null)
+  const [isBillingStatusLoading, setIsBillingStatusLoading] = useState(false)
+  const [groupsRefreshVersion, setGroupsRefreshVersion] = useState(0)
+  const [billingStatusRefreshVersion, setBillingStatusRefreshVersion] = useState(0)
+  const hasBillingGroups = billingGroups.length > 0
+  const hasProTier =
+    hasBillingGroups && (billingStatus?.planTier === 'pro' || billingStatus?.hasActiveSubscription === true)
+  const billingCtaHref = hasBillingGroups ? '/profile#billing' : '/groups'
+  const billingCtaLabel = hasBillingGroups ? 'Upgrade to Pro' : 'Create Group to Upgrade'
+  const billingMenuLabel = hasProTier ? 'Manage Billing' : billingCtaLabel
 
   const navItems = [
     { href: '/calendar', label: 'Calendar' },
@@ -29,6 +66,143 @@ export function Navbar() {
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`)
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const loadUserGroups = async () => {
+      if (!user) {
+        setBillingGroups([])
+        setActiveBillingGroupId('')
+        setBillingStatus(null)
+        setIsBillingStatusLoading(false)
+        return
+      }
+
+      const [{ data: ownedGroups, error: ownedError }, { data: memberGroups, error: memberError }] = await Promise.all([
+        supabase.from('groups').select('id, name').eq('owner_id', user.id),
+        supabase
+          .from('group_members')
+          .select('group:groups(id, name)')
+          .eq('user_id', user.id)
+          .returns<MemberGroupRow[]>(),
+      ])
+
+      if (isCancelled) return
+      if (ownedError || memberError) {
+        setBillingGroups([])
+        setActiveBillingGroupId('')
+        setBillingStatus(null)
+        return
+      }
+
+      const uniqueGroups = [
+        ...(ownedGroups ?? []),
+        ...((memberGroups ?? [])
+          .map((row) => row.group)
+          .filter((group): group is Group => Boolean(group))),
+      ].filter((group, index, source) => index === source.findIndex((item) => item.id === group.id))
+
+      setBillingGroups(uniqueGroups)
+
+      if (uniqueGroups.length === 0) {
+        setActiveBillingGroupId('')
+        setBillingStatus(null)
+        return
+      }
+
+      const storedGroupId = readStoredBillingGroupId()
+      const hasStoredGroup = Boolean(storedGroupId && uniqueGroups.some((group) => group.id === storedGroupId))
+      const nextGroupId = hasStoredGroup && storedGroupId ? storedGroupId : uniqueGroups[0].id
+      setActiveBillingGroupId((current) => {
+        if (current && uniqueGroups.some((group) => group.id === current)) {
+          return current
+        }
+        return nextGroupId
+      })
+    }
+
+    void loadUserGroups()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [groupsRefreshVersion, pathname, user?.id])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const requestGroupsRefresh = () => {
+      setGroupsRefreshVersion((current) => current + 1)
+    }
+
+    const handleBillingGroupChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ groupId?: string }>
+      const nextGroupId = customEvent.detail?.groupId
+      if (!nextGroupId) return
+      if (!billingGroups.some((group) => group.id === nextGroupId)) return
+      setActiveBillingGroupId(nextGroupId)
+    }
+
+    const requestBillingStatusRefresh = (event: Event) => {
+      const customEvent = event as CustomEvent<{ groupId?: string }>
+      const nextGroupId = customEvent.detail?.groupId
+      if (nextGroupId && nextGroupId !== activeBillingGroupId) return
+      setBillingStatusRefreshVersion((current) => current + 1)
+    }
+
+    window.addEventListener(BILLING_GROUPS_UPDATED_EVENT, requestGroupsRefresh)
+    window.addEventListener('focus', requestGroupsRefresh)
+    window.addEventListener(BILLING_GROUP_CHANGE_EVENT, handleBillingGroupChange as EventListener)
+    window.addEventListener(BILLING_STATUS_UPDATED_EVENT, requestBillingStatusRefresh as EventListener)
+    return () => {
+      window.removeEventListener(BILLING_GROUPS_UPDATED_EVENT, requestGroupsRefresh)
+      window.removeEventListener('focus', requestGroupsRefresh)
+      window.removeEventListener(BILLING_GROUP_CHANGE_EVENT, handleBillingGroupChange as EventListener)
+      window.removeEventListener(BILLING_STATUS_UPDATED_EVENT, requestBillingStatusRefresh as EventListener)
+    }
+  }, [activeBillingGroupId, billingGroups])
+
+  useEffect(() => {
+    let isCancelled = false
+
+    const loadBillingStatus = async () => {
+      if (!user || !activeBillingGroupId) {
+        setBillingStatus(null)
+        setIsBillingStatusLoading(false)
+        return
+      }
+
+      setIsBillingStatusLoading(true)
+      try {
+        const query = new URLSearchParams({
+          groupId: activeBillingGroupId,
+          sourceType: 'url',
+        })
+        const response = await fetch(`/api/billing/status?${query.toString()}`)
+
+        if (!response.ok) {
+          throw new Error('Failed to load billing status')
+        }
+
+        const payload = (await response.json()) as BillingStatusResponse
+        if (isCancelled) return
+        setBillingStatus(payload)
+      } catch {
+        if (isCancelled) return
+        setBillingStatus(null)
+      } finally {
+        if (isCancelled) return
+        setIsBillingStatusLoading(false)
+      }
+    }
+
+    void loadBillingStatus()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [activeBillingGroupId, billingStatusRefreshVersion, user?.id])
 
   return (
     <nav className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
@@ -71,6 +245,37 @@ export function Navbar() {
           </div>
         ) : user ? (
           <div className="flex items-center gap-2">
+            {hasBillingGroups && (
+              <>
+                <Link
+                  href="/profile#billing"
+                  className="inline-flex rounded-full border border-border/70 bg-card px-2 py-1 text-[11px] font-medium text-foreground transition-colors hover:bg-surface-2 sm:px-3 sm:text-xs"
+                >
+                  {isBillingStatusLoading
+                    ? 'Loading credits...'
+                    : billingStatus
+                      ? `${billingStatus.remainingCredits}/${billingStatus.monthlyCredits} credits`
+                      : 'Credits unavailable'}
+                </Link>
+
+              </>
+            )}
+
+            {hasProTier ? (
+              <Link href="/profile#billing" className="hidden md:inline-flex">
+                <Chip className="h-9 gap-1 border-emerald-500/30 bg-emerald-500/10 px-3 text-emerald-700">
+                  <Crown className="h-3.5 w-3.5" aria-hidden="true" />
+                  Pro Plan
+                </Chip>
+              </Link>
+            ) : (
+              <Link href={billingCtaHref} className="hidden md:inline-flex">
+                <Button variant="outline" size="sm" className="border-border/70 bg-card">
+                  {billingCtaLabel}
+                </Button>
+              </Link>
+            )}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -93,6 +298,12 @@ export function Navbar() {
                     </Link>
                   </DropdownMenuItem>
                 ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={billingCtaHref}>
+                    {billingMenuLabel}
+                  </Link>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -109,6 +320,10 @@ export function Navbar() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem className="text-xs uppercase tracking-wide text-muted-foreground">
                   {user.email}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={billingCtaHref}>{billingMenuLabel}</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => signOut()}>

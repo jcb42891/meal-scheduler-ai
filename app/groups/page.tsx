@@ -9,6 +9,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
+import { notifyBillingGroupsUpdated, writeStoredBillingGroupId } from '@/lib/billing/client'
 import { toast } from 'sonner'
 import { Plus, Trash2 } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -124,6 +125,8 @@ export default function GroupsPage() {
       toast.success('Group created successfully')
       setShowCreateDialog(false)
       setNewGroupName('')
+      writeStoredBillingGroupId(groupData.id)
+      notifyBillingGroupsUpdated(groupData.id)
       fetchGroups() // Refresh the list
     } catch (error) {
       console.error('Error in group creation:', error)
@@ -146,6 +149,7 @@ export default function GroupsPage() {
       if (error) throw error
 
       toast.success('Group deleted successfully')
+      notifyBillingGroupsUpdated()
       fetchGroups() // Refresh the list
     } catch (error) {
       console.error('Error deleting group:', error)

@@ -50,6 +50,20 @@
       "when": 1769958275000,
       "tag": "0006_m3_credit_function_ambiguity_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1769961875000,
+      "tag": "0007_m4_billing_entitlements",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1769965475000,
+      "tag": "0008_m4_sync_group_import_account_for_plan_conflict_fix",
+      "breakpoints": true
     }
   ]
 }

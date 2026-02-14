@@ -1,11 +1,7 @@
-import { pgTable, pgSchema, foreignKey, unique, pgPolicy, uuid, text, numeric, timestamp, boolean, date, index, uniqueIndex, check, bigserial, integer, jsonb, bigint, primaryKey, pgView } from "drizzle-orm/pg-core"
+import { pgTable, foreignKey, unique, pgPolicy, uuid, text, numeric, timestamp, boolean, date, index, uniqueIndex, check, bigserial, integer, jsonb, bigint, primaryKey, pgView } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
-const auth = pgSchema("auth");
 
-export const usersInAuth = auth.table("users", {
-	id: uuid("id").notNull(),
-});
 
 export const staple_ingredients = pgTable("staple_ingredients", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
@@ -19,7 +15,7 @@ export const staple_ingredients = pgTable("staple_ingredients", {
 }, (table) => [
 	foreignKey({
 			columns: [table.created_by],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [users.id],
 			name: "staple_ingredients_created_by_fkey"
 		}),
 	foreignKey({
@@ -42,7 +38,7 @@ export const groups = pgTable("groups", {
 }, (table) => [
 	foreignKey({
 			columns: [table.owner_id],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [users.id],
 			name: "groups_owner_id_fkey"
 		}),
 	pgPolicy("Members can view groups", { as: "permissive", for: "select", to: ["authenticated"], using: sql`((owner_id = auth.uid()) OR is_group_member(id))` }),
@@ -73,7 +69,7 @@ export const meals = pgTable("meals", {
 }, (table) => [
 	foreignKey({
 			columns: [table.created_by],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [users.id],
 			name: "meals_created_by_fkey"
 		}),
 	foreignKey({
@@ -121,7 +117,7 @@ export const profiles = pgTable("profiles", {
 }, (table) => [
 	foreignKey({
 			columns: [table.id],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [users.id],
 			name: "profiles_id_fkey"
 		}).onDelete("cascade"),
 	pgPolicy("Enable delete for users based on id", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = id)` }),
@@ -153,7 +149,7 @@ export const group_invitations = pgTable("group_invitations", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.invited_by],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [users.id],
 			name: "group_invitations_invited_by_fkey"
 		}),
 	pgPolicy("Members can view invitations", { as: "permissive", for: "select", to: ["authenticated"], using: sql`((invited_by = auth.uid()) OR is_group_member(group_id) OR is_group_owner(group_id) OR ((lower(email) = current_user_email()) AND (status = 'pending'::text) AND ((expires_at IS NULL) OR (expires_at > now()))))` }),
@@ -203,7 +199,7 @@ export const import_usage_events = pgTable("import_usage_events", {
 		}).onDelete("set null"),
 	foreignKey({
 			columns: [table.user_id],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [users.id],
 			name: "import_usage_events_user_id_fkey"
 		}).onDelete("set null"),
 	check("import_usage_events_confidence_check", sql`(confidence IS NULL) OR ((confidence >= (0)::numeric) AND (confidence <= (1)::numeric))`),
@@ -240,7 +236,7 @@ export const import_credit_accounts = pgTable("import_credit_accounts", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.user_id],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [users.id],
 			name: "import_credit_accounts_user_id_fkey"
 		}).onDelete("cascade"),
 	check("import_credit_accounts_monthly_credits_check", sql`monthly_credits >= 0`),
@@ -279,6 +275,140 @@ export const import_credit_ledger = pgTable("import_credit_ledger", {
 	check("import_credit_ledger_monthly_allocation_delta_check", sql`(entry_type <> 'monthly_allocation'::text) OR (credits_delta >= 0)`),
 	check("import_credit_ledger_source_type_check", sql`(source_type IS NULL) OR (source_type = ANY (ARRAY['image'::text, 'url'::text, 'text'::text]))`),
 	check("import_credit_ledger_usage_delta_check", sql`(entry_type <> 'usage'::text) OR (credits_delta <= 0)`),
+]);
+
+export const plans = pgTable("plans", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	code: text().notNull(),
+	name: text().notNull(),
+	stripe_price_id: text(),
+	monthly_credits: integer().notNull(),
+	active: boolean().default(true).notNull(),
+	metadata: jsonb().default({}).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("plans_code_key").on(table.code),
+	unique("plans_stripe_price_id_key").on(table.stripe_price_id),
+	pgPolicy("Authenticated can view active plans", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(active = true)` }),
+	check("plans_monthly_credits_check", sql`monthly_credits >= 0`),
+]);
+
+export const subscriptions = pgTable("subscriptions", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	group_id: uuid().notNull(),
+	plan_id: uuid(),
+	provider: text().default('stripe').notNull(),
+	provider_customer_id: text(),
+	provider_subscription_id: text(),
+	status: text().default('inactive').notNull(),
+	current_period_start: timestamp({ withTimezone: true, mode: 'string' }),
+	current_period_end: timestamp({ withTimezone: true, mode: 'string' }),
+	cancel_at_period_end: boolean().default(false).notNull(),
+	grace_until: timestamp({ withTimezone: true, mode: 'string' }),
+	last_webhook_event_id: text(),
+	last_webhook_received_at: timestamp({ withTimezone: true, mode: 'string' }),
+	metadata: jsonb().default({}).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	uniqueIndex("subscriptions_group_id_provider_unique_idx").using("btree", table.group_id.asc().nullsLast().op("text_ops"), table.provider.asc().nullsLast().op("uuid_ops")),
+	index("subscriptions_group_id_status_idx").using("btree", table.group_id.asc().nullsLast().op("uuid_ops"), table.status.asc().nullsLast().op("text_ops")),
+	uniqueIndex("subscriptions_provider_subscription_id_unique_idx").using("btree", table.provider_subscription_id.asc().nullsLast().op("text_ops")).where(sql`(provider_subscription_id IS NOT NULL)`),
+	foreignKey({
+			columns: [table.group_id],
+			foreignColumns: [groups.id],
+			name: "subscriptions_group_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.plan_id],
+			foreignColumns: [plans.id],
+			name: "subscriptions_plan_id_fkey"
+		}).onDelete("set null"),
+	pgPolicy("Group members can view subscriptions", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(is_group_owner(group_id) OR is_group_member(group_id))` }),
+	check("subscriptions_status_check", sql`status = ANY (ARRAY['inactive'::text, 'trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text, 'incomplete'::text, 'incomplete_expired'::text, 'unpaid'::text, 'paused'::text])`),
+]);
+
+export const entitlements = pgTable("entitlements", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	scope_type: text().notNull(),
+	user_id: uuid(),
+	group_id: uuid(),
+	feature_key: text().notNull(),
+	status: text().default('active').notNull(),
+	source: text().default('manual').notNull(),
+	unlimited: boolean().default(false).notNull(),
+	monthly_credits_override: integer(),
+	plan_id: uuid(),
+	subscription_id: uuid(),
+	valid_from: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	valid_to: timestamp({ withTimezone: true, mode: 'string' }),
+	metadata: jsonb().default({}).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("entitlements_group_feature_idx").using("btree", table.group_id.asc().nullsLast().op("text_ops"), table.feature_key.asc().nullsLast().op("uuid_ops")).where(sql`(group_id IS NOT NULL)`),
+	index("entitlements_scope_feature_status_idx").using("btree", table.scope_type.asc().nullsLast().op("text_ops"), table.feature_key.asc().nullsLast().op("text_ops"), table.status.asc().nullsLast().op("text_ops")),
+	index("entitlements_user_feature_idx").using("btree", table.user_id.asc().nullsLast().op("text_ops"), table.feature_key.asc().nullsLast().op("text_ops")).where(sql`(user_id IS NOT NULL)`),
+	foreignKey({
+			columns: [table.group_id],
+			foreignColumns: [groups.id],
+			name: "entitlements_group_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.plan_id],
+			foreignColumns: [plans.id],
+			name: "entitlements_plan_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.subscription_id],
+			foreignColumns: [subscriptions.id],
+			name: "entitlements_subscription_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "entitlements_user_id_fkey"
+		}).onDelete("cascade"),
+	pgPolicy("Users can view relevant entitlements", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(((scope_type = 'user'::text) AND (user_id = auth.uid())) OR ((scope_type = 'group'::text) AND (is_group_owner(group_id) OR is_group_member(group_id))))` }),
+	check("entitlements_monthly_credits_override_check", sql`(monthly_credits_override IS NULL) OR (monthly_credits_override >= 0)`),
+	check("entitlements_scope_target_check", sql`((scope_type = 'user'::text) AND (user_id IS NOT NULL) AND (group_id IS NULL)) OR ((scope_type = 'group'::text) AND (group_id IS NOT NULL) AND (user_id IS NULL))`),
+	check("entitlements_scope_type_check", sql`scope_type = ANY (ARRAY['user'::text, 'group'::text])`),
+	check("entitlements_status_check", sql`status = ANY (ARRAY['active'::text, 'inactive'::text, 'expired'::text])`),
+	check("entitlements_valid_window_check", sql`(valid_to IS NULL) OR (valid_to > valid_from)`),
+]);
+
+export const credit_purchases = pgTable("credit_purchases", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	group_id: uuid().notNull(),
+	user_id: uuid(),
+	provider: text().default('stripe').notNull(),
+	provider_payment_intent_id: text(),
+	provider_invoice_id: text(),
+	credits: integer().notNull(),
+	amount_cents: integer().notNull(),
+	currency: text().default('usd').notNull(),
+	status: text().default('pending').notNull(),
+	metadata: jsonb().default({}).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("credit_purchases_group_created_at_idx").using("btree", table.group_id.asc().nullsLast().op("timestamptz_ops"), table.created_at.desc().nullsFirst().op("timestamptz_ops")),
+	uniqueIndex("credit_purchases_provider_payment_intent_unique_idx").using("btree", table.provider_payment_intent_id.asc().nullsLast().op("text_ops")).where(sql`(provider_payment_intent_id IS NOT NULL)`),
+	foreignKey({
+			columns: [table.group_id],
+			foreignColumns: [groups.id],
+			name: "credit_purchases_group_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "credit_purchases_user_id_fkey"
+		}).onDelete("set null"),
+	pgPolicy("Users can view relevant credit purchases", { as: "permissive", for: "select", to: ["authenticated"], using: sql`((user_id = auth.uid()) OR is_group_owner(group_id) OR is_group_member(group_id))` }),
+	check("credit_purchases_amount_cents_check", sql`amount_cents >= 0`),
+	check("credit_purchases_credits_check", sql`credits > 0`),
+	check("credit_purchases_status_check", sql`status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'refunded'::text])`),
 ]);
 
 export const meal_ingredients = pgTable("meal_ingredients", {
@@ -344,7 +474,7 @@ export const import_rate_limits = pgTable("import_rate_limits", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.user_id],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [users.id],
 			name: "import_rate_limits_user_id_fkey"
 		}).onDelete("cascade"),
 	primaryKey({ columns: [table.user_id, table.group_id], name: "import_rate_limits_pkey"}),

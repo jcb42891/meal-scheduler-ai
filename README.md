@@ -14,3 +14,8 @@ This is a web app that lets you plan / schedule meals and generate grocery lists
 ## Auth email redirect env vars
 - Optional: `NEXT_PUBLIC_APP_ORIGIN` to force auth email redirect links (signup confirmation + password reset) to your deployed app origin.
 - Local behavior: when app runtime origin is `localhost`/`127.0.0.1`, redirects default to local origin unless `NEXT_PUBLIC_APP_ORIGIN_ALLOW_DEV_OVERRIDE=true`.
+
+## Stripe billing setup
+- Billing/entitlement integration for Magic Import is documented in `docs/stripe-billing-setup.md`.
+- Key runtime vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_MAGIC_IMPORT_PRICE_ID`.
+- Owner test bypass vars: `MAGIC_IMPORT_OVERRIDE_USER_IDS`, `MAGIC_IMPORT_OVERRIDE_USER_EMAILS`.

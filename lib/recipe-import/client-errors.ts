@@ -9,7 +9,7 @@ type RecipeImportErrorPayload = {
   retryAfterSeconds?: number
 }
 
-const RATE_LIMIT_ERROR_CODES = new Set(['rate_limited', 'quota_exceeded'])
+const RATE_LIMIT_ERROR_CODES = new Set(['rate_limited'])
 const INPUT_ERROR_CODES = new Set([
   'invalid_payload',
   'bad_request',
@@ -55,6 +55,10 @@ export function getRecipeImportParseErrorMessage(input: RecipeImportErrorInput):
       return `Too many recipe import attempts. Try again in about ${input.retryAfterSeconds} seconds.`
     }
     return 'Too many recipe import attempts. Please try again shortly.'
+  }
+
+  if (input.code === 'quota_exceeded') {
+    return 'Magic Import credits are exhausted for this group. Upgrade billing or wait for the monthly reset.'
   }
 
   if (input.status === 504 || input.code === 'timeout' || input.code === 'parse_timeout') {

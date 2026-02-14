@@ -12,6 +12,14 @@ import { normalizeParsedRecipe } from '@/lib/recipe-import/normalize'
 import { checkRecipeImportRateLimit } from '@/lib/recipe-import/rate-limit'
 import { consumeGroupImportCredits, recordImportUsageEvent } from '@/lib/recipe-import/usage'
 import type { ImportSourceType } from '@/lib/recipe-import/types'
+import { isStripeBillingConfigured } from '@/lib/billing/config'
+import { createSupabaseAdminClient } from '@/lib/billing/supabase-admin'
+import { getStripeClient } from '@/lib/billing/stripe'
+import {
+  assertUserCanAccessGroup,
+  getMagicImportEntitlementStatus,
+  syncGroupSubscriptionByLookup,
+} from '@/lib/billing/server'
 
 export const runtime = 'nodejs'
 
@@ -112,22 +120,6 @@ function validateImageFile(imageFile?: File): asserts imageFile is File {
       code: 'image_too_large',
     })
   }
-}
-
-async function userHasGroupAccess(
-  supabase: SupabaseClient,
-  groupId: string,
-  userId: string,
-) {
-  const [{ data: ownerRow, error: ownerError }, { data: memberRow, error: memberError }] = await Promise.all([
-    supabase.from('groups').select('id').eq('id', groupId).eq('owner_id', userId).maybeSingle(),
-    supabase.from('group_members').select('group_id').eq('group_id', groupId).eq('user_id', userId).maybeSingle(),
-  ])
-
-  if (ownerError) throw ownerError
-  if (memberError) throw memberError
-
-  return Boolean(ownerRow || memberRow)
 }
 
 async function toDataUrl(file: File): Promise<string> {
@@ -244,7 +236,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized', code: 'unauthorized' }, { status: 401 })
     }
 
-    const hasAccess = await userHasGroupAccess(supabase, groupId, session.user.id)
+    const hasAccess = await assertUserCanAccessGroup(supabase, groupId, session.user.id)
     if (!hasAccess) {
       return NextResponse.json(
         {
@@ -289,6 +281,57 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    let entitlementStatus = await getMagicImportEntitlementStatus(supabase, {
+      groupId,
+      sourceType: input.sourceType,
+      userId: session.user.id,
+      userEmail: session.user.email,
+    })
+
+    if (!entitlementStatus.allowed && isStripeBillingConfigured() && !entitlementStatus.isEnvOverride) {
+      try {
+        const supabaseAdmin = createSupabaseAdminClient()
+        const stripe = getStripeClient()
+        const refreshed = await syncGroupSubscriptionByLookup(supabaseAdmin, {
+          stripe,
+          groupId,
+        })
+
+        if (refreshed) {
+          entitlementStatus = await getMagicImportEntitlementStatus(supabase, {
+            groupId,
+            sourceType: input.sourceType,
+            userId: session.user.id,
+            userEmail: session.user.email,
+          })
+        }
+      } catch {
+      }
+    }
+
+    if (!entitlementStatus.allowed) {
+      throw new HttpError(
+        `Not enough import credits remaining this month. Required: ${entitlementStatus.requiredCredits}, remaining: ${entitlementStatus.remainingCredits}.`,
+        429,
+        {
+          code: entitlementStatus.reasonCode ?? 'quota_exceeded',
+          details: {
+            requiredCredits: entitlementStatus.requiredCredits,
+            remainingCredits: entitlementStatus.remainingCredits,
+            monthlyCredits: entitlementStatus.monthlyCredits,
+            usedCredits: entitlementStatus.usedCredits,
+            periodStart: entitlementStatus.periodStart,
+            planTier: entitlementStatus.planTier,
+            hasActiveSubscription: entitlementStatus.hasActiveSubscription,
+            graceActive: entitlementStatus.graceActive,
+            isUnlimited: entitlementStatus.isUnlimited,
+            isEnvOverride: entitlementStatus.isEnvOverride,
+            upgradeAvailable: isStripeBillingConfigured() && !entitlementStatus.hasActiveSubscription,
+          },
+        },
+      )
+    }
+
     const warnings: string[] = []
     let sourceText = ''
     let imageDataUrl: string | undefined
@@ -327,12 +370,22 @@ export async function POST(req: NextRequest) {
       usageContext.inputBytes = input.imageFile.size
     }
 
-    const creditResult = await consumeGroupImportCredits(supabase, {
-      groupId,
-      sourceType: input.sourceType,
-      requestId: usageContext.requestId,
-      usageEventId: usageContext.attemptEventId,
-    })
+    const creditResult = entitlementStatus.isUnlimited
+      ? {
+          allowed: true,
+          requiredCredits: 0,
+          periodStart: entitlementStatus.periodStart,
+          planTier: entitlementStatus.planTier,
+          monthlyCredits: entitlementStatus.monthlyCredits,
+          usedCredits: entitlementStatus.usedCredits,
+          remainingCredits: entitlementStatus.remainingCredits,
+        }
+      : await consumeGroupImportCredits(supabase, {
+          groupId,
+          sourceType: input.sourceType,
+          requestId: usageContext.requestId,
+          usageEventId: usageContext.attemptEventId,
+        })
 
     if (!creditResult.allowed) {
       throw new HttpError(
@@ -347,6 +400,11 @@ export async function POST(req: NextRequest) {
             usedCredits: creditResult.usedCredits,
             periodStart: creditResult.periodStart,
             planTier: creditResult.planTier,
+            hasActiveSubscription: entitlementStatus.hasActiveSubscription,
+            graceActive: entitlementStatus.graceActive,
+            isUnlimited: entitlementStatus.isUnlimited,
+            isEnvOverride: entitlementStatus.isEnvOverride,
+            upgradeAvailable: isStripeBillingConfigured() && !entitlementStatus.hasActiveSubscription,
           },
         },
       )

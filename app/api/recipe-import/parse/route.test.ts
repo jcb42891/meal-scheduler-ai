@@ -9,6 +9,12 @@ const fetchRecipeTextFromUrlMock = vi.hoisted(() => vi.fn())
 const parseRecipeWithOpenAIMock = vi.hoisted(() => vi.fn())
 const parseRecipeFromPlainTextFallbackMock = vi.hoisted(() => vi.fn())
 const normalizeParsedRecipeMock = vi.hoisted(() => vi.fn())
+const assertUserCanAccessGroupMock = vi.hoisted(() => vi.fn())
+const getMagicImportEntitlementStatusMock = vi.hoisted(() => vi.fn())
+const syncGroupSubscriptionByLookupMock = vi.hoisted(() => vi.fn())
+const isStripeBillingConfiguredMock = vi.hoisted(() => vi.fn())
+const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn())
+const getStripeClientMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@supabase/auth-helpers-nextjs', () => ({
   createRouteHandlerClient: createRouteHandlerClientMock,
@@ -41,6 +47,24 @@ vi.mock('@/lib/recipe-import/fallback', () => ({
 
 vi.mock('@/lib/recipe-import/normalize', () => ({
   normalizeParsedRecipe: normalizeParsedRecipeMock,
+}))
+
+vi.mock('@/lib/billing/server', () => ({
+  assertUserCanAccessGroup: assertUserCanAccessGroupMock,
+  getMagicImportEntitlementStatus: getMagicImportEntitlementStatusMock,
+  syncGroupSubscriptionByLookup: syncGroupSubscriptionByLookupMock,
+}))
+
+vi.mock('@/lib/billing/config', () => ({
+  isStripeBillingConfigured: isStripeBillingConfiguredMock,
+}))
+
+vi.mock('@/lib/billing/supabase-admin', () => ({
+  createSupabaseAdminClient: createSupabaseAdminClientMock,
+}))
+
+vi.mock('@/lib/billing/stripe', () => ({
+  getStripeClient: getStripeClientMock,
 }))
 
 type SupabaseOptions = {
@@ -114,6 +138,25 @@ describe('POST /api/recipe-import/parse', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     cookiesMock.mockResolvedValue({})
+    assertUserCanAccessGroupMock.mockResolvedValue(true)
+    getMagicImportEntitlementStatusMock.mockResolvedValue({
+      allowed: true,
+      reasonCode: null,
+      planTier: 'free',
+      periodStart: '2026-02-01',
+      monthlyCredits: 40,
+      usedCredits: 1,
+      remainingCredits: 39,
+      requiredCredits: 1,
+      isUnlimited: false,
+      hasActiveSubscription: false,
+      graceActive: false,
+      isEnvOverride: false,
+    })
+    syncGroupSubscriptionByLookupMock.mockResolvedValue(false)
+    isStripeBillingConfiguredMock.mockReturnValue(false)
+    createSupabaseAdminClientMock.mockReturnValue({})
+    getStripeClientMock.mockReturnValue({})
     checkRecipeImportRateLimitMock.mockResolvedValue({
       allowed: true,
       limit: 8,
@@ -196,6 +239,7 @@ describe('POST /api/recipe-import/parse', () => {
   it('returns 403 when the user has no access to the requested group', async () => {
     const { supabase } = createSupabaseMock({ ownerRow: null, memberRow: null })
     createRouteHandlerClientMock.mockReturnValue(supabase)
+    assertUserCanAccessGroupMock.mockResolvedValue(false)
 
     const { POST } = await import('./route')
     const response = await POST(
@@ -269,5 +313,79 @@ describe('POST /api/recipe-import/parse', () => {
       code: 'rate_limited',
       retryAfterSeconds: 33,
     })
+  })
+
+  it('returns 429 when entitlements do not allow importing', async () => {
+    const { supabase } = createSupabaseMock()
+    createRouteHandlerClientMock.mockReturnValue(supabase)
+    getMagicImportEntitlementStatusMock.mockResolvedValue({
+      allowed: false,
+      reasonCode: 'quota_exceeded',
+      planTier: 'free',
+      periodStart: '2026-02-01',
+      monthlyCredits: 40,
+      usedCredits: 40,
+      remainingCredits: 0,
+      requiredCredits: 1,
+      isUnlimited: false,
+      hasActiveSubscription: false,
+      graceActive: false,
+      isEnvOverride: false,
+    })
+
+    const { POST } = await import('./route')
+    const response = await POST(
+      makeJsonRequest({
+        groupId,
+        sourceType: 'text',
+        text: '1 cup rice',
+      }) as never,
+    )
+
+    expect(response.status).toBe(429)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'quota_exceeded',
+      requiredCredits: 1,
+      remainingCredits: 0,
+      upgradeAvailable: false,
+    })
+    expect(consumeGroupImportCreditsMock).not.toHaveBeenCalled()
+  })
+
+  it('skips credit consumption when an unlimited override is active', async () => {
+    const { supabase } = createSupabaseMock()
+    createRouteHandlerClientMock.mockReturnValue(supabase)
+    getMagicImportEntitlementStatusMock.mockResolvedValue({
+      allowed: true,
+      reasonCode: null,
+      planTier: 'override',
+      periodStart: '2026-02-01',
+      monthlyCredits: 40,
+      usedCredits: 0,
+      remainingCredits: 40,
+      requiredCredits: 0,
+      isUnlimited: true,
+      hasActiveSubscription: false,
+      graceActive: false,
+      isEnvOverride: true,
+    })
+
+    const { POST } = await import('./route')
+    const response = await POST(
+      makeJsonRequest({
+        groupId,
+        sourceType: 'text',
+        text: '1 cup rice',
+      }) as never,
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      usage: {
+        creditsCharged: 0,
+        planTier: 'override',
+      },
+    })
+    expect(consumeGroupImportCreditsMock).not.toHaveBeenCalled()
   })
 })

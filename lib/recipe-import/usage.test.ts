@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { consumeGroupImportCredits, recordImportUsageEvent } from './usage'
+import {
+  consumeGroupImportCredits,
+  getGroupMagicImportStatus,
+  recordImportUsageEvent,
+} from './usage'
 
 type RpcResult = {
   data: unknown
@@ -179,14 +183,14 @@ describe('consumeGroupImportCredits', () => {
     expect(supabase.rpc).toHaveBeenCalledWith('consume_group_import_credits', {
       p_group_id: 'group-2',
       p_source_type: 'image',
-      p_credits: 1,
+      p_credits: 3,
       p_request_id: 'request-5',
       p_usage_event_id: null,
       p_default_monthly_credits: 40,
     })
     expect(result).toEqual({
       allowed: false,
-      requiredCredits: 1,
+      requiredCredits: 3,
       periodStart: '2026-02-02',
       planTier: 'free',
       monthlyCredits: 40,
@@ -223,5 +227,85 @@ describe('consumeGroupImportCredits', () => {
         requestId: 'request-7',
       }),
     ).rejects.toThrow('Credit accounting returned an empty response.')
+  })
+})
+
+describe('getGroupMagicImportStatus', () => {
+  const originalMonthlyCredits = process.env.RECIPE_IMPORT_MONTHLY_CREDITS
+  const originalImageCredits = process.env.RECIPE_IMPORT_CREDITS_IMAGE
+  const originalUrlCredits = process.env.RECIPE_IMPORT_CREDITS_URL
+  const originalTextCredits = process.env.RECIPE_IMPORT_CREDITS_TEXT
+
+  beforeEach(() => {
+    delete process.env.RECIPE_IMPORT_MONTHLY_CREDITS
+    delete process.env.RECIPE_IMPORT_CREDITS_IMAGE
+    delete process.env.RECIPE_IMPORT_CREDITS_URL
+    delete process.env.RECIPE_IMPORT_CREDITS_TEXT
+  })
+
+  afterEach(() => {
+    process.env.RECIPE_IMPORT_MONTHLY_CREDITS = originalMonthlyCredits
+    process.env.RECIPE_IMPORT_CREDITS_IMAGE = originalImageCredits
+    process.env.RECIPE_IMPORT_CREDITS_URL = originalUrlCredits
+    process.env.RECIPE_IMPORT_CREDITS_TEXT = originalTextCredits
+  })
+
+  it('calls RPC with weighted source credits and normalizes response', async () => {
+    process.env.RECIPE_IMPORT_CREDITS_URL = '4'
+    const supabase = createSupabaseMock({
+      data: {
+        allowed: true,
+        reason_code: null,
+        plan_tier: ' pro ',
+        period_start: '2026-02-01',
+        monthly_credits: '120',
+        used_credits: '20',
+        remaining_credits: '100',
+        required_credits: '4',
+        is_unlimited: false,
+        has_active_subscription: true,
+        grace_active: false,
+      },
+      error: null,
+    })
+
+    const result = await getGroupMagicImportStatus(supabase as never, {
+      groupId: 'group-1',
+      sourceType: 'url',
+    })
+
+    expect(supabase.rpc).toHaveBeenCalledWith('get_group_magic_import_status', {
+      p_group_id: 'group-1',
+      p_source_type: 'url',
+      p_required_credits: 4,
+      p_default_monthly_credits: 40,
+    })
+    expect(result).toEqual({
+      allowed: true,
+      reasonCode: null,
+      planTier: 'pro',
+      periodStart: '2026-02-01',
+      monthlyCredits: 120,
+      usedCredits: 20,
+      remainingCredits: 100,
+      requiredCredits: 4,
+      isUnlimited: false,
+      hasActiveSubscription: true,
+      graceActive: false,
+    })
+  })
+
+  it('throws when RPC status row is missing', async () => {
+    const supabase = createSupabaseMock({
+      data: null,
+      error: null,
+    })
+
+    await expect(
+      getGroupMagicImportStatus(supabase as never, {
+        groupId: 'group-2',
+        sourceType: 'text',
+      }),
+    ).rejects.toThrow('Import entitlement status returned an empty response.')
   })
 })
