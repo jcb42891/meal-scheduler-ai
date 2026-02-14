@@ -18,8 +18,6 @@ const toastErrorMock = vi.hoisted(() => vi.fn())
 const toastSuccessMock = vi.hoisted(() => vi.fn())
 
 let profileResponse: { data: { first_name: string | null; last_name: string | null } | null }
-let ownedGroupsResponse: { data: Array<{ id: string; name: string }> | null; error: { message: string } | null }
-let memberGroupsResponse: { data: Array<{ group: { id: string; name: string } }> | null; error: { message: string } | null }
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPushMock }),
@@ -74,23 +72,6 @@ function installSupabaseMocks() {
       }
     }
 
-    if (table === 'groups') {
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue(ownedGroupsResponse),
-        }),
-      }
-    }
-
-    if (table === 'group_members') {
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnThis(),
-          returns: vi.fn().mockResolvedValue(memberGroupsResponse),
-        }),
-      }
-    }
-
     throw new Error(`Unexpected table: ${table}`)
   })
 }
@@ -103,14 +84,6 @@ describe('ProfilePage', () => {
     searchParamsState.tab = null
     profileResponse = {
       data: { first_name: 'Ava', last_name: 'Cook' },
-    }
-    ownedGroupsResponse = {
-      data: [{ id: 'group-1', name: 'Family' }],
-      error: null,
-    }
-    memberGroupsResponse = {
-      data: [],
-      error: null,
     }
     fetchMock.mockResolvedValue({
       ok: true,
@@ -136,15 +109,15 @@ describe('ProfilePage', () => {
     installSupabaseMocks()
   })
 
-  it('opens on the billing tab with a prominent billing dashboard by default', async () => {
+  it('opens on the billing tab with account-level billing content by default', async () => {
     render(<ProfilePage />)
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/billing/status?groupId=group-1&sourceType=url')
+      expect(fetchMock).toHaveBeenCalledWith('/api/billing/status?sourceType=url')
     })
 
     expect(screen.getByText('Billing Command Center')).toBeInTheDocument()
-    expect(screen.getByText('Keep recipe magic flowing')).toBeInTheDocument()
+    expect(screen.getByText('Track account credits, manage your plan, and upgrade in one place.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Upgrade to Pro' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reset Password' })).not.toBeInTheDocument()
   })
@@ -158,19 +131,36 @@ describe('ProfilePage', () => {
     })
 
     expect(screen.getByRole('heading', { name: 'Account Details' })).toBeInTheDocument()
-    expect(screen.queryByText('Keep recipe magic flowing')).not.toBeInTheDocument()
+    expect(screen.queryByText('Track account credits, manage your plan, and upgrade in one place.')).not.toBeInTheDocument()
   })
 
-  it('shows create-group CTA when no groups exist', async () => {
-    ownedGroupsResponse = { data: [], error: null }
-    memberGroupsResponse = { data: [], error: null }
-    installSupabaseMocks()
+  it('shows account-level blocked copy when credits are exhausted', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        planTier: 'free',
+        allowed: false,
+        reasonCode: 'quota_exceeded',
+        periodStart: '2026-02-01T00:00:00.000Z',
+        monthlyCredits: 40,
+        usedCredits: 40,
+        remainingCredits: 0,
+        requiredCredits: 1,
+        isUnlimited: false,
+        hasActiveSubscription: false,
+        graceActive: false,
+        isEnvOverride: false,
+        billing: {
+          stripeConfigured: true,
+          canManage: true,
+        },
+      }),
+    })
 
     render(<ProfilePage />)
 
-    const createGroupLink = await screen.findByRole('link', { name: 'Create Your First Group' })
-    expect(createGroupLink).toHaveAttribute('href', '/groups')
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(
+      await screen.findByText('Magic Import is currently blocked for your account. Upgrading to Pro restores access.'),
+    ).toBeInTheDocument()
   })
-
 })

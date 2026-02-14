@@ -152,7 +152,9 @@ describe('Navbar', () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        '/api/billing/status?groupId=group-1&sourceType=url',
+        expect.stringMatching(
+          /\/api\/billing\/status\?(?:groupId=group-1&sourceType=url|sourceType=url&groupId=group-1)/,
+        ),
       )
     })
 
@@ -187,7 +189,11 @@ describe('Navbar', () => {
     render(<Navbar />)
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/billing/status?groupId=group-1&sourceType=url')
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /\/api\/billing\/status\?(?:groupId=group-1&sourceType=url|sourceType=url&groupId=group-1)/,
+        ),
+      )
     })
 
     expect(screen.getByRole('link', { name: 'Pro Plan' })).toHaveAttribute('href', '/profile?tab=billing')
@@ -198,7 +204,7 @@ describe('Navbar', () => {
     expect(screen.queryByRole('link', { name: 'Upgrade to Pro' })).not.toBeInTheDocument()
   })
 
-  it('shows create-group billing CTA when authenticated user has no groups', async () => {
+  it('shows account-level billing CTA when authenticated user has no groups', async () => {
     authState.user = { email: 'new-user@example.com' }
     ownedGroupsResponse = {
       data: [],
@@ -217,9 +223,12 @@ describe('Navbar', () => {
       expect(supabaseFromMock).toHaveBeenCalledWith('group_members')
     })
 
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(screen.getByRole('link', { name: 'Create Group to Upgrade' })).toHaveAttribute('href', '/groups')
-    expect(screen.queryByText('credits', { exact: false })).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/billing/status?sourceType=url')
+    })
+
+    expect(screen.getByRole('link', { name: '33/40 credits' })).toHaveAttribute('href', '/profile?tab=billing')
+    expect(screen.getAllByRole('link', { name: 'Upgrade to Pro' }).length).toBeGreaterThan(0)
   })
 
   it('refreshes billing controls when groups are updated after initial load', async () => {
@@ -236,9 +245,8 @@ describe('Navbar', () => {
 
     render(<Navbar />)
 
-    await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Create Group to Upgrade' })).toBeInTheDocument()
-    })
+    expect(await screen.findByRole('link', { name: 'Upgrade to Pro' })).toHaveAttribute('href', '/profile?tab=billing')
+    expect(fetchMock).toHaveBeenCalledWith('/api/billing/status?sourceType=url')
 
     ownedGroupsResponse = {
       data: [{ id: 'group-1', name: 'Family' }],
@@ -251,7 +259,11 @@ describe('Navbar', () => {
     window.dispatchEvent(new CustomEvent(BILLING_GROUPS_UPDATED_EVENT, { detail: { groupId: 'group-1' } }))
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/billing/status?groupId=group-1&sourceType=url')
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /\/api\/billing\/status\?(?:groupId=group-1&sourceType=url|sourceType=url&groupId=group-1)/,
+        ),
+      )
     })
 
     expect(screen.getByRole('link', { name: '33/40 credits' })).toHaveAttribute('href', '/profile?tab=billing')
@@ -293,6 +305,11 @@ describe('Navbar', () => {
 
     expect(await screen.findByRole('link', { name: '31/40 credits' })).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/billing/status?groupId=group-1&sourceType=url')
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(
+        /\/api\/billing\/status\?(?:groupId=group-1&sourceType=url|sourceType=url&groupId=group-1)/,
+      ),
+    )
   })
 })

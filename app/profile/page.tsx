@@ -1,7 +1,6 @@
 'use client'
 
 import { useAuth } from '@/lib/contexts/AuthContext'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
@@ -12,22 +11,12 @@ import { supabase } from '@/lib/supabase'
 import { buildClientAppUrl } from '@/lib/client-app-url'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/page-header'
-import { ArrowUpRight, CreditCard, Loader2, Sparkles, UserCircle2, Users } from 'lucide-react'
+import { CreditCard, Loader2, Sparkles, UserCircle2 } from 'lucide-react'
 import { getMagicImportBillingCtas } from '@/app/meals/magic-import-billing-cta'
-import { readStoredBillingGroupId, writeStoredBillingGroupId } from '@/lib/billing/client'
 
 type Profile = {
   first_name: string | null
   last_name: string | null
-}
-
-type Group = {
-  id: string
-  name: string
-}
-
-type MemberGroupRow = {
-  group: Group
 }
 
 type BillingStatusResponse = {
@@ -61,8 +50,6 @@ export default function ProfilePage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
-  const [userGroups, setUserGroups] = useState<Group[]>([])
-  const [selectedBillingGroupId, setSelectedBillingGroupId] = useState('')
   const [billingStatus, setBillingStatus] = useState<BillingStatusResponse | null>(null)
   const [isBillingStatusLoading, setIsBillingStatusLoading] = useState(false)
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false)
@@ -70,10 +57,6 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<ProfileTab>('billing')
 
   const billingCtas = useMemo(() => getMagicImportBillingCtas(billingStatus), [billingStatus])
-  const selectedGroup = useMemo(
-    () => userGroups.find((group) => group.id === selectedBillingGroupId) ?? null,
-    [selectedBillingGroupId, userGroups],
-  )
   const creditsUsedPercent = billingStatus?.monthlyCredits
     ? Math.min(100, Math.max(0, (billingStatus.usedCredits / billingStatus.monthlyCredits) * 100))
     : 0
@@ -114,50 +97,11 @@ export default function ProfilePage() {
       }
     }
 
-    const fetchGroups = async () => {
-      const [{ data: ownedGroups, error: ownedError }, { data: memberGroups, error: memberError }] = await Promise.all([
-        supabase.from('groups').select('id, name').eq('owner_id', user.id),
-        supabase
-          .from('group_members')
-          .select('group:groups(id, name)')
-          .eq('user_id', user.id)
-          .returns<MemberGroupRow[]>(),
-      ])
-
-      if (ownedError || memberError) {
-        toast.error('Failed to load groups')
-        return
-      }
-
-      const allGroups = [
-        ...(ownedGroups ?? []),
-        ...((memberGroups ?? [])
-          .map((row) => row.group)
-          .filter((group): group is Group => Boolean(group))),
-      ].filter((group, index, source) => index === source.findIndex((item) => item.id === group.id))
-
-      setUserGroups(allGroups)
-
-      if (allGroups.length === 0) {
-        setSelectedBillingGroupId('')
-        return
-      }
-
-      const storedGroupId = readStoredBillingGroupId()
-      const hasStoredGroup = Boolean(storedGroupId && allGroups.some((group) => group.id === storedGroupId))
-      const nextGroupId = hasStoredGroup && storedGroupId ? storedGroupId : allGroups[0].id
-      setSelectedBillingGroupId(nextGroupId)
-      if (nextGroupId && !hasStoredGroup) {
-        writeStoredBillingGroupId(nextGroupId)
-      }
-    }
-
     fetchProfile()
-    fetchGroups()
   }, [user, router])
 
   useEffect(() => {
-    if (!selectedBillingGroupId) {
+    if (!user) {
       setBillingStatus(null)
       return
     }
@@ -168,7 +112,6 @@ export default function ProfilePage() {
       setIsBillingStatusLoading(true)
       try {
         const query = new URLSearchParams({
-          groupId: selectedBillingGroupId,
           sourceType: 'url',
         })
         const response = await fetch(`/api/billing/status?${query.toString()}`)
@@ -193,23 +136,16 @@ export default function ProfilePage() {
     return () => {
       isCancelled = true
     }
-  }, [selectedBillingGroupId])
-
-  const handleBillingGroupChange = (groupId: string) => {
-    setSelectedBillingGroupId(groupId)
-    writeStoredBillingGroupId(groupId)
-  }
+  }, [user])
 
   const startBillingRedirect = async (path: '/api/billing/checkout' | '/api/billing/portal') => {
-    if (!selectedBillingGroupId) return
-
     const setLoading = path === '/api/billing/checkout' ? setIsCheckoutLoading : setIsPortalLoading
     setLoading(true)
     try {
       const response = await fetch(path, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ groupId: selectedBillingGroupId }),
+        body: JSON.stringify({}),
       })
 
       const payload = await response.json().catch(() => null)
@@ -326,15 +262,13 @@ export default function ProfilePage() {
                   <div className="space-y-1">
                     <h2 className="text-xl font-semibold text-amber-950 sm:text-2xl">Keep recipe magic flowing</h2>
                     <p className="text-sm text-amber-900/80">
-                      Pick a group, track monthly credits, and upgrade in one place.
+                      Track account credits, manage your plan, and upgrade in one place.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs font-semibold text-amber-900/85">
                     <span className="rounded-full border border-amber-300/70 bg-white/75 px-2.5 py-1">
-                      <Users className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
-                      Group: {selectedGroup?.name ?? 'Not selected'}
+                      Account Plan: {planLabel}
                     </span>
-                    <span className="rounded-full border border-amber-300/70 bg-white/75 px-2.5 py-1">Plan: {planLabel}</span>
                   </div>
                 </div>
 
@@ -344,7 +278,7 @@ export default function ProfilePage() {
                     {isBillingStatusLoading ? '--' : billingStatus ? billingStatus.remainingCredits : '--'}
                   </p>
                   <p className="mt-1 text-xs text-amber-900/80">
-                    {billingStatus ? `of ${billingStatus.monthlyCredits} monthly credits` : 'Select a group to load usage'}
+                    {billingStatus ? `of ${billingStatus.monthlyCredits} monthly credits` : 'Loading account usage'}
                   </p>
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-amber-900/20">
                     <span
@@ -355,37 +289,11 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,260px)_1fr]">
-                <div className="space-y-2">
-                  <label htmlFor="billing-group-select" className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">
-                    Billing Group
-                  </label>
-                  <select
-                    id="billing-group-select"
-                    value={selectedBillingGroupId}
-                    onChange={(event) => handleBillingGroupChange(event.target.value)}
-                    className="box-border h-10 w-full appearance-none rounded-md border border-solid border-amber-300/80 bg-white/80 px-3 text-sm shadow-sm [background-clip:padding-box] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
-                  >
-                    <option value="">Select a group</option>
-                    {userGroups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
+              <div className="mt-5 grid gap-3">
                 <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">Billing Actions</p>
                   <div className="flex min-h-10 flex-wrap items-center gap-2">
-                    {userGroups.length === 0 ? (
-                      <Button type="button" asChild>
-                        <Link href="/groups">
-                          Create Your First Group
-                          <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-                        </Link>
-                      </Button>
-                    ) : isBillingStatusLoading ? (
+                    {isBillingStatusLoading ? (
                       <Button type="button" variant="outline" disabled>
                         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                         Loading billing status...
@@ -416,14 +324,10 @@ export default function ProfilePage() {
                     ) : null}
                   </div>
 
-                  {userGroups.length === 0 ? (
-                    <p className="text-xs text-amber-900/80">Groups unlock shared plans, billing, and credit pools.</p>
-                  ) : billingStatus && !billingStatus.billing.stripeConfigured ? (
+                  {billingStatus && !billingStatus.billing.stripeConfigured ? (
                     <p className="text-xs text-amber-900/80">Stripe billing is not configured yet.</p>
                   ) : billingStatus && !billingStatus.billing.canManage ? (
-                    <p className="text-xs text-amber-900/80">
-                      You need billing permissions in this group before opening Stripe.
-                    </p>
+                    <p className="text-xs text-amber-900/80">Billing is unavailable for this account.</p>
                   ) : null}
                 </div>
               </div>
@@ -433,12 +337,10 @@ export default function ProfilePage() {
           <Card>
             <CardHeader className="space-y-1">
               <h3 className="text-lg font-semibold">Current Billing Snapshot</h3>
-              <p className="text-sm text-muted-foreground">Usage and plan details for your selected group.</p>
+              <p className="text-sm text-muted-foreground">Usage and plan details for your account.</p>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!selectedBillingGroupId ? (
-                <p className="text-sm text-muted-foreground">Select a group to view billing details.</p>
-              ) : isBillingStatusLoading ? (
+              {isBillingStatusLoading ? (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading billing status...
@@ -478,7 +380,7 @@ export default function ProfilePage() {
 
                   {billingCtas.showBlockedNotice && (
                     <p className="rounded-md border border-amber-300/70 bg-amber-100/60 px-3 py-2 text-sm text-amber-900">
-                      Magic Import is currently blocked for this group. Upgrading to Pro restores access.
+                      Magic Import is currently blocked for your account. Upgrading to Pro restores access.
                     </p>
                   )}
                 </>

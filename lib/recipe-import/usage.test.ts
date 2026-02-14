@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  consumeGroupImportCredits,
-  getGroupMagicImportStatus,
+  consumeUserImportCredits,
+  getUserMagicImportStatus,
   recordImportUsageEvent,
 } from './usage'
 
@@ -92,7 +92,7 @@ describe('recordImportUsageEvent', () => {
   })
 })
 
-describe('consumeGroupImportCredits', () => {
+describe('consumeUserImportCredits', () => {
   const originalMonthlyCredits = process.env.RECIPE_IMPORT_MONTHLY_CREDITS
   const originalImageCredits = process.env.RECIPE_IMPORT_CREDITS_IMAGE
   const originalUrlCredits = process.env.RECIPE_IMPORT_CREDITS_URL
@@ -129,15 +129,15 @@ describe('consumeGroupImportCredits', () => {
       error: null,
     })
 
-    const result = await consumeGroupImportCredits(supabase as never, {
-      groupId: 'group-1',
+    const result = await consumeUserImportCredits(supabase as never, {
+      userId: 'user-1',
       sourceType: 'url',
       requestId: 'request-4',
       usageEventId: 11,
     })
 
-    expect(supabase.rpc).toHaveBeenCalledWith('consume_group_import_credits', {
-      p_group_id: 'group-1',
+    expect(supabase.rpc).toHaveBeenCalledWith('consume_user_import_credits', {
+      p_user_id: 'user-1',
       p_source_type: 'url',
       p_credits: 3,
       p_request_id: 'request-4',
@@ -174,14 +174,14 @@ describe('consumeGroupImportCredits', () => {
       error: null,
     })
 
-    const result = await consumeGroupImportCredits(supabase as never, {
-      groupId: 'group-2',
+    const result = await consumeUserImportCredits(supabase as never, {
+      userId: 'user-2',
       sourceType: 'image',
       requestId: 'request-5',
     })
 
-    expect(supabase.rpc).toHaveBeenCalledWith('consume_group_import_credits', {
-      p_group_id: 'group-2',
+    expect(supabase.rpc).toHaveBeenCalledWith('consume_user_import_credits', {
+      p_user_id: 'user-2',
       p_source_type: 'image',
       p_credits: 3,
       p_request_id: 'request-5',
@@ -206,8 +206,8 @@ describe('consumeGroupImportCredits', () => {
     })
 
     await expect(
-      consumeGroupImportCredits(supabase as never, {
-        groupId: 'group-3',
+      consumeUserImportCredits(supabase as never, {
+        userId: 'user-3',
         sourceType: 'text',
         requestId: 'request-6',
       }),
@@ -221,8 +221,8 @@ describe('consumeGroupImportCredits', () => {
     })
 
     await expect(
-      consumeGroupImportCredits(supabase as never, {
-        groupId: 'group-4',
+      consumeUserImportCredits(supabase as never, {
+        userId: 'user-4',
         sourceType: 'text',
         requestId: 'request-7',
       }),
@@ -230,7 +230,7 @@ describe('consumeGroupImportCredits', () => {
   })
 })
 
-describe('getGroupMagicImportStatus', () => {
+describe('getUserMagicImportStatus', () => {
   const originalMonthlyCredits = process.env.RECIPE_IMPORT_MONTHLY_CREDITS
   const originalImageCredits = process.env.RECIPE_IMPORT_CREDITS_IMAGE
   const originalUrlCredits = process.env.RECIPE_IMPORT_CREDITS_URL
@@ -269,13 +269,13 @@ describe('getGroupMagicImportStatus', () => {
       error: null,
     })
 
-    const result = await getGroupMagicImportStatus(supabase as never, {
-      groupId: 'group-1',
+    const result = await getUserMagicImportStatus(supabase as never, {
+      userId: 'user-1',
       sourceType: 'url',
     })
 
-    expect(supabase.rpc).toHaveBeenCalledWith('get_group_magic_import_status', {
-      p_group_id: 'group-1',
+    expect(supabase.rpc).toHaveBeenCalledWith('get_user_magic_import_status', {
+      p_user_id: 'user-1',
       p_source_type: 'url',
       p_required_credits: 4,
       p_default_monthly_credits: 40,
@@ -302,8 +302,8 @@ describe('getGroupMagicImportStatus', () => {
     })
 
     await expect(
-      getGroupMagicImportStatus(supabase as never, {
-        groupId: 'group-2',
+      getUserMagicImportStatus(supabase as never, {
+        userId: 'user-2',
         sourceType: 'text',
       }),
     ).rejects.toThrow('Import entitlement status returned an empty response.')

@@ -5,13 +5,11 @@ import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/billing/supabase-admin'
 import { getStripeClient } from '@/lib/billing/stripe'
 import { getStripeMagicImportPriceId } from '@/lib/billing/config'
-import { assertUserCanManageGroupBilling, resolveBillingAppOrigin } from '@/lib/billing/server'
+import { resolveBillingAppOrigin } from '@/lib/billing/server'
 
 export const runtime = 'nodejs'
 
-const requestSchema = z.object({
-  groupId: z.string().uuid(),
-})
+const requestSchema = z.object({}).passthrough()
 
 type RouteCookiesGetter = () => Promise<Awaited<ReturnType<typeof cookies>>>
 
@@ -21,7 +19,7 @@ type ExistingSubscriptionRow = {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = requestSchema.parse(await request.json())
+    await requestSchema.parse(await request.json().catch(() => ({})))
     const stripePriceId = getStripeMagicImportPriceId()
 
     if (!stripePriceId) {
@@ -50,24 +48,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized', code: 'unauthorized' }, { status: 401 })
     }
 
-    const group = await assertUserCanManageGroupBilling(supabase, body.groupId, session.user.id)
-    if (!group) {
-      return NextResponse.json(
-        {
-          error: 'You must be a member of this group to manage billing.',
-          code: 'forbidden',
-        },
-        { status: 403 },
-      )
-    }
-
     const supabaseAdmin = createSupabaseAdminClient()
     const stripe = getStripeClient()
 
     const { data: existingSubscription, error: subscriptionLookupError } = await supabaseAdmin
       .from('subscriptions')
       .select('provider_customer_id')
-      .eq('group_id', body.groupId)
+      .eq('user_id', session.user.id)
       .eq('provider', 'stripe')
       .maybeSingle<ExistingSubscriptionRow>()
 
@@ -81,7 +68,7 @@ export async function POST(request: NextRequest) {
           await stripe.customers.create({
             email: session.user.email ?? undefined,
             metadata: {
-              group_id: body.groupId,
+              user_id: session.user.id,
               initiated_by_user_id: session.user.id,
             },
           })
@@ -90,7 +77,7 @@ export async function POST(request: NextRequest) {
     const nowIso = new Date().toISOString()
     const { error: upsertError } = await supabaseAdmin.from('subscriptions').upsert(
       {
-        group_id: body.groupId,
+        user_id: session.user.id,
         provider: 'stripe',
         provider_customer_id: customerId,
         status: 'inactive',
@@ -100,7 +87,7 @@ export async function POST(request: NextRequest) {
         updated_at: nowIso,
       },
       {
-        onConflict: 'group_id,provider',
+        onConflict: 'user_id,provider',
       },
     )
 
@@ -118,11 +105,10 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${appOrigin}/meals?billing=success`,
-      cancel_url: `${appOrigin}/meals?billing=cancel`,
-      client_reference_id: body.groupId,
+      success_url: `${appOrigin}/profile?tab=billing&billing=success`,
+      cancel_url: `${appOrigin}/profile?tab=billing&billing=cancel`,
+      client_reference_id: session.user.id,
       metadata: {
-        group_id: body.groupId,
         user_id: session.user.id,
         feature_key: 'magic_import',
       },

@@ -45,15 +45,14 @@ export function Navbar() {
   const pathname = usePathname()
   const [billingGroups, setBillingGroups] = useState<Group[]>([])
   const [activeBillingGroupId, setActiveBillingGroupId] = useState('')
+  const [isGroupsResolved, setIsGroupsResolved] = useState(false)
   const [billingStatus, setBillingStatus] = useState<BillingStatusResponse | null>(null)
   const [isBillingStatusLoading, setIsBillingStatusLoading] = useState(false)
   const [groupsRefreshVersion, setGroupsRefreshVersion] = useState(0)
   const [billingStatusRefreshVersion, setBillingStatusRefreshVersion] = useState(0)
-  const hasBillingGroups = billingGroups.length > 0
-  const hasProTier =
-    hasBillingGroups && (billingStatus?.planTier === 'pro' || billingStatus?.hasActiveSubscription === true)
-  const billingCtaHref = hasBillingGroups ? '/profile?tab=billing' : '/groups'
-  const billingCtaLabel = hasBillingGroups ? 'Upgrade to Pro' : 'Create Group to Upgrade'
+  const hasProTier = billingStatus?.planTier === 'pro' || billingStatus?.hasActiveSubscription === true
+  const billingCtaHref = '/profile?tab=billing'
+  const billingCtaLabel = 'Upgrade to Pro'
   const billingMenuLabel = hasProTier ? 'Manage Billing' : billingCtaLabel
   const creditLabel = isBillingStatusLoading
     ? 'Loading credits...'
@@ -82,10 +81,13 @@ export function Navbar() {
       if (!user) {
         setBillingGroups([])
         setActiveBillingGroupId('')
+        setIsGroupsResolved(false)
         setBillingStatus(null)
         setIsBillingStatusLoading(false)
         return
       }
+
+      setIsGroupsResolved(false)
 
       const [{ data: ownedGroups, error: ownedError }, { data: memberGroups, error: memberError }] = await Promise.all([
         supabase.from('groups').select('id, name').eq('owner_id', user.id),
@@ -100,7 +102,7 @@ export function Navbar() {
       if (ownedError || memberError) {
         setBillingGroups([])
         setActiveBillingGroupId('')
-        setBillingStatus(null)
+        setIsGroupsResolved(true)
         return
       }
 
@@ -115,7 +117,7 @@ export function Navbar() {
 
       if (uniqueGroups.length === 0) {
         setActiveBillingGroupId('')
-        setBillingStatus(null)
+        setIsGroupsResolved(true)
         return
       }
 
@@ -128,6 +130,7 @@ export function Navbar() {
         }
         return nextGroupId
       })
+      setIsGroupsResolved(true)
     }
 
     void loadUserGroups()
@@ -175,8 +178,10 @@ export function Navbar() {
     let isCancelled = false
 
     const loadBillingStatus = async () => {
-      if (!user || !activeBillingGroupId) {
-        setBillingStatus(null)
+      if (!user || !isGroupsResolved) {
+        if (!user) {
+          setBillingStatus(null)
+        }
         setIsBillingStatusLoading(false)
         return
       }
@@ -184,9 +189,11 @@ export function Navbar() {
       setIsBillingStatusLoading(true)
       try {
         const query = new URLSearchParams({
-          groupId: activeBillingGroupId,
           sourceType: 'url',
         })
+        if (activeBillingGroupId) {
+          query.set('groupId', activeBillingGroupId)
+        }
         const response = await fetch(`/api/billing/status?${query.toString()}`)
 
         if (!response.ok) {
@@ -210,7 +217,7 @@ export function Navbar() {
     return () => {
       isCancelled = true
     }
-  }, [activeBillingGroupId, billingStatusRefreshVersion, user?.id])
+  }, [activeBillingGroupId, billingStatusRefreshVersion, isGroupsResolved, user?.id])
 
   return (
     <nav className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
@@ -253,28 +260,26 @@ export function Navbar() {
           </div>
         ) : user ? (
           <div className="flex items-center gap-2">
-            {hasBillingGroups && (
-              <Link
-                href={billingCtaHref}
-                className="group inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-gradient-to-r from-amber-100 via-orange-100 to-rose-100 px-2.5 py-1 text-[11px] font-semibold text-amber-950 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:px-3 sm:text-xs"
-              >
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-amber-700 shadow-sm">
-                  <Wallet className="h-3 w-3" aria-hidden="true" />
-                </span>
-                <span className="leading-none">{creditLabel}</span>
-                {billingStatus && !isBillingStatusLoading && (
-                  <span className="hidden items-center gap-1 sm:inline-flex">
-                    <span className="h-1.5 w-12 overflow-hidden rounded-full bg-amber-900/20">
-                      <span
-                        className="block h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-500"
-                        style={{ width: `${creditUsagePercent}%` }}
-                      />
-                    </span>
-                    <Sparkles className="h-3 w-3 text-rose-600" aria-hidden="true" />
+            <Link
+              href={billingCtaHref}
+              className="group inline-flex items-center gap-2 rounded-full border border-amber-300/70 bg-gradient-to-r from-amber-100 via-orange-100 to-rose-100 px-2.5 py-1 text-[11px] font-semibold text-amber-950 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:px-3 sm:text-xs"
+            >
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-amber-700 shadow-sm">
+                <Wallet className="h-3 w-3" aria-hidden="true" />
+              </span>
+              <span className="leading-none">{creditLabel}</span>
+              {billingStatus && !isBillingStatusLoading && (
+                <span className="hidden items-center gap-1 sm:inline-flex">
+                  <span className="h-1.5 w-12 overflow-hidden rounded-full bg-amber-900/20">
+                    <span
+                      className="block h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-500"
+                      style={{ width: `${creditUsagePercent}%` }}
+                    />
                   </span>
-                )}
-              </Link>
-            )}
+                  <Sparkles className="h-3 w-3 text-rose-600" aria-hidden="true" />
+                </span>
+              )}
+            </Link>
 
             {hasProTier ? (
               <Link href={billingCtaHref} className="hidden md:inline-flex">
@@ -287,14 +292,9 @@ export function Navbar() {
               <Link href={billingCtaHref} className="hidden md:inline-flex">
                 <Button
                   size="sm"
-                  className={cn(
-                    'h-9 rounded-full px-4 text-xs font-semibold text-white shadow-md',
-                    hasBillingGroups
-                      ? 'bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 shadow-orange-500/35 hover:brightness-105 hover:shadow-lg hover:shadow-orange-500/40'
-                      : 'bg-gradient-to-r from-primary to-emerald-600 shadow-primary/35 hover:brightness-105 hover:shadow-lg hover:shadow-primary/40'
-                  )}
+                  className="h-9 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 px-4 text-xs font-semibold text-white shadow-md shadow-orange-500/35 hover:brightness-105 hover:shadow-lg hover:shadow-orange-500/40"
                 >
-                  {hasBillingGroups && <Crown className="h-3.5 w-3.5" aria-hidden="true" />}
+                  <Crown className="h-3.5 w-3.5" aria-hidden="true" />
                   {billingCtaLabel}
                 </Button>
               </Link>

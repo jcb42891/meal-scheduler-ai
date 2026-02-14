@@ -269,12 +269,11 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
   }
 
   const fetchBillingStatus = useCallback(async () => {
-    if (!open || !groupId) return
+    if (!open) return
 
     setIsBillingStatusLoading(true)
     try {
       const query = new URLSearchParams({
-        groupId,
         sourceType,
       })
       const response = await fetch(`/api/billing/status?${query.toString()}`, {
@@ -292,22 +291,20 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
     } finally {
       setIsBillingStatusLoading(false)
     }
-  }, [groupId, open, sourceType])
+  }, [open, sourceType])
 
   useEffect(() => {
     fetchBillingStatus()
   }, [fetchBillingStatus])
 
   const startBillingRedirect = async (path: '/api/billing/checkout' | '/api/billing/portal') => {
-    if (!groupId) return
-
     const setLoading = path === '/api/billing/checkout' ? setIsCheckoutLoading : setIsPortalLoading
     setLoading(true)
     try {
       const response = await fetch(path, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ groupId }),
+        body: JSON.stringify({}),
       })
 
       const payload = await response.json().catch(() => null)
@@ -339,7 +336,7 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
     }
 
     if (billingStatus && !billingStatus.allowed && !billingStatus.isUnlimited) {
-      toast.error('This group is out of Magic Import credits. Upgrade to continue importing.')
+      toast.error('Your account is out of Magic Import credits. Upgrade to continue importing.')
       return
     }
 
@@ -662,7 +659,7 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
                     {(billingCtas.showBlockedNotice || billingCtas.showUpgrade || billingCtas.showManage) && (
                       <div className="space-y-2 rounded-[8px] border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-950 dark:text-amber-100">
                         {billingCtas.showBlockedNotice ? (
-                          <p>Magic Import credits are exhausted for this group.</p>
+                          <p>Magic Import credits are exhausted for your account.</p>
                         ) : (
                           <p>Upgrade to Pro for more monthly Magic Import credits.</p>
                         )}

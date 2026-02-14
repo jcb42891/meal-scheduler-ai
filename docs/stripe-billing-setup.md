@@ -36,8 +36,10 @@ Subscribe to events:
 - `customer.subscription.created`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
+- `invoice.paid`
 - `invoice.payment_succeeded`
 - `invoice.payment_failed`
+- `invoice_payment.paid`
 
 ## 4) Local webhook testing (Stripe CLI)
 

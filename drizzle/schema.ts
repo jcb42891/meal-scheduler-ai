@@ -1,14 +1,5 @@
-import { pgTable, pgSchema, foreignKey, unique, pgPolicy, uuid, text, numeric, timestamp, boolean, date, index, uniqueIndex, check, bigserial, integer, jsonb, bigint, primaryKey, pgView } from "drizzle-orm/pg-core"
+import { pgTable, foreignKey, unique, pgPolicy, uuid, text, numeric, timestamp, boolean, date, index, uniqueIndex, check, bigserial, integer, jsonb, bigint, primaryKey, pgView } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
-
-
-const auth = pgSchema("auth");
-
-export const usersInAuth = auth.table("users", {
-	id: uuid("id").notNull(),
-});
-
-export const users = usersInAuth;
 
 
 
@@ -286,6 +277,41 @@ export const import_credit_ledger = pgTable("import_credit_ledger", {
 	check("import_credit_ledger_usage_delta_check", sql`(entry_type <> 'usage'::text) OR (credits_delta <= 0)`),
 ]);
 
+export const subscriptions = pgTable("subscriptions", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	plan_id: uuid(),
+	provider: text().default('stripe').notNull(),
+	provider_customer_id: text(),
+	provider_subscription_id: text(),
+	status: text().default('inactive').notNull(),
+	current_period_start: timestamp({ withTimezone: true, mode: 'string' }),
+	current_period_end: timestamp({ withTimezone: true, mode: 'string' }),
+	cancel_at_period_end: boolean().default(false).notNull(),
+	grace_until: timestamp({ withTimezone: true, mode: 'string' }),
+	last_webhook_event_id: text(),
+	last_webhook_received_at: timestamp({ withTimezone: true, mode: 'string' }),
+	metadata: jsonb().default({}).notNull(),
+	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	user_id: uuid().notNull(),
+}, (table) => [
+	uniqueIndex("subscriptions_provider_subscription_id_unique_idx").using("btree", table.provider_subscription_id.asc().nullsLast().op("text_ops")).where(sql`(provider_subscription_id IS NOT NULL)`),
+	uniqueIndex("subscriptions_user_id_provider_unique_idx").using("btree", table.user_id.asc().nullsLast().op("text_ops"), table.provider.asc().nullsLast().op("text_ops")),
+	index("subscriptions_user_id_status_idx").using("btree", table.user_id.asc().nullsLast().op("text_ops"), table.status.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.plan_id],
+			foreignColumns: [plans.id],
+			name: "subscriptions_plan_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.user_id],
+			foreignColumns: [users.id],
+			name: "subscriptions_user_id_fkey"
+		}).onDelete("cascade"),
+	pgPolicy("Users can view own subscriptions", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(user_id = auth.uid())` }),
+	check("subscriptions_status_check", sql`status = ANY (ARRAY['inactive'::text, 'trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text, 'incomplete'::text, 'incomplete_expired'::text, 'unpaid'::text, 'paused'::text])`),
+]);
+
 export const plans = pgTable("plans", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	code: text().notNull(),
@@ -301,41 +327,6 @@ export const plans = pgTable("plans", {
 	unique("plans_stripe_price_id_key").on(table.stripe_price_id),
 	pgPolicy("Authenticated can view active plans", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(active = true)` }),
 	check("plans_monthly_credits_check", sql`monthly_credits >= 0`),
-]);
-
-export const subscriptions = pgTable("subscriptions", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	group_id: uuid().notNull(),
-	plan_id: uuid(),
-	provider: text().default('stripe').notNull(),
-	provider_customer_id: text(),
-	provider_subscription_id: text(),
-	status: text().default('inactive').notNull(),
-	current_period_start: timestamp({ withTimezone: true, mode: 'string' }),
-	current_period_end: timestamp({ withTimezone: true, mode: 'string' }),
-	cancel_at_period_end: boolean().default(false).notNull(),
-	grace_until: timestamp({ withTimezone: true, mode: 'string' }),
-	last_webhook_event_id: text(),
-	last_webhook_received_at: timestamp({ withTimezone: true, mode: 'string' }),
-	metadata: jsonb().default({}).notNull(),
-	created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	uniqueIndex("subscriptions_group_id_provider_unique_idx").using("btree", table.group_id.asc().nullsLast().op("text_ops"), table.provider.asc().nullsLast().op("uuid_ops")),
-	index("subscriptions_group_id_status_idx").using("btree", table.group_id.asc().nullsLast().op("uuid_ops"), table.status.asc().nullsLast().op("text_ops")),
-	uniqueIndex("subscriptions_provider_subscription_id_unique_idx").using("btree", table.provider_subscription_id.asc().nullsLast().op("text_ops")).where(sql`(provider_subscription_id IS NOT NULL)`),
-	foreignKey({
-			columns: [table.group_id],
-			foreignColumns: [groups.id],
-			name: "subscriptions_group_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.plan_id],
-			foreignColumns: [plans.id],
-			name: "subscriptions_plan_id_fkey"
-		}).onDelete("set null"),
-	pgPolicy("Group members can view subscriptions", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(is_group_owner(group_id) OR is_group_member(group_id))` }),
-	check("subscriptions_status_check", sql`status = ANY (ARRAY['inactive'::text, 'trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text, 'incomplete'::text, 'incomplete_expired'::text, 'unpaid'::text, 'paused'::text])`),
 ]);
 
 export const entitlements = pgTable("entitlements", {

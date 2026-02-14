@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type Stripe from 'stripe'
-import { assertUserCanManageGroupBilling, syncGroupSubscriptionFromStripe } from './server'
+import { assertUserCanAccessGroup, syncUserSubscriptionFromStripe } from './server'
 
-type GroupQueryResult = {
-  data: { id: string; owner_id: string } | null
+type OwnerQueryResult = {
+  data: { id: string } | null
   error: { message: string } | null
 }
 
@@ -12,16 +12,16 @@ type MemberQueryResult = {
   error: { message: string } | null
 }
 
-function createSupabaseMock({
-  groupResult,
+function createAccessSupabaseMock({
+  ownerResult,
   memberResult,
 }: {
-  groupResult: GroupQueryResult
+  ownerResult: OwnerQueryResult
   memberResult: MemberQueryResult
 }) {
-  const groupQuery = {
+  const ownerQuery = {
     eq: vi.fn().mockReturnThis(),
-    maybeSingle: vi.fn().mockResolvedValue(groupResult),
+    maybeSingle: vi.fn().mockResolvedValue(ownerResult),
   }
 
   const memberQuery = {
@@ -33,7 +33,7 @@ function createSupabaseMock({
     from: vi.fn().mockImplementation((table: string) => {
       if (table === 'groups') {
         return {
-          select: vi.fn().mockReturnValue(groupQuery),
+          select: vi.fn().mockReturnValue(ownerQuery),
         }
       }
 
@@ -50,11 +50,11 @@ function createSupabaseMock({
   return supabase as never
 }
 
-describe('assertUserCanManageGroupBilling', () => {
-  it('returns the group for owners', async () => {
-    const supabase = createSupabaseMock({
-      groupResult: {
-        data: { id: 'group-1', owner_id: 'owner-1' },
+describe('assertUserCanAccessGroup', () => {
+  it('returns true for owners', async () => {
+    const supabase = createAccessSupabaseMock({
+      ownerResult: {
+        data: { id: 'group-1' },
         error: null,
       },
       memberResult: {
@@ -63,48 +63,14 @@ describe('assertUserCanManageGroupBilling', () => {
       },
     })
 
-    const result = await assertUserCanManageGroupBilling(supabase, 'group-1', 'owner-1')
+    const result = await assertUserCanAccessGroup(supabase, 'group-1', 'owner-1')
 
-    expect(result).toEqual({ id: 'group-1', owner_id: 'owner-1' })
+    expect(result).toBe(true)
   })
 
-  it('returns the group for non-owner members', async () => {
-    const supabase = createSupabaseMock({
-      groupResult: {
-        data: { id: 'group-1', owner_id: 'owner-1' },
-        error: null,
-      },
-      memberResult: {
-        data: { group_id: 'group-1' },
-        error: null,
-      },
-    })
-
-    const result = await assertUserCanManageGroupBilling(supabase, 'group-1', 'member-1')
-
-    expect(result).toEqual({ id: 'group-1', owner_id: 'owner-1' })
-  })
-
-  it('returns null when the user is neither owner nor member', async () => {
-    const supabase = createSupabaseMock({
-      groupResult: {
-        data: { id: 'group-1', owner_id: 'owner-1' },
-        error: null,
-      },
-      memberResult: {
-        data: null,
-        error: null,
-      },
-    })
-
-    const result = await assertUserCanManageGroupBilling(supabase, 'group-1', 'outsider-1')
-
-    expect(result).toBeNull()
-  })
-
-  it('returns null when the group does not exist', async () => {
-    const supabase = createSupabaseMock({
-      groupResult: {
+  it('returns true for members', async () => {
+    const supabase = createAccessSupabaseMock({
+      ownerResult: {
         data: null,
         error: null,
       },
@@ -114,16 +80,16 @@ describe('assertUserCanManageGroupBilling', () => {
       },
     })
 
-    const result = await assertUserCanManageGroupBilling(supabase, 'group-1', 'member-1')
+    const result = await assertUserCanAccessGroup(supabase, 'group-1', 'member-1')
 
-    expect(result).toBeNull()
+    expect(result).toBe(true)
   })
 
-  it('throws when group lookup fails', async () => {
-    const supabase = createSupabaseMock({
-      groupResult: {
+  it('returns false when the user has no ownership or membership', async () => {
+    const supabase = createAccessSupabaseMock({
+      ownerResult: {
         data: null,
-        error: { message: 'group query failed' },
+        error: null,
       },
       memberResult: {
         data: null,
@@ -131,15 +97,15 @@ describe('assertUserCanManageGroupBilling', () => {
       },
     })
 
-    await expect(assertUserCanManageGroupBilling(supabase, 'group-1', 'member-1')).rejects.toMatchObject({
-      message: 'group query failed',
-    })
+    const result = await assertUserCanAccessGroup(supabase, 'group-1', 'outsider-1')
+
+    expect(result).toBe(false)
   })
 
   it('throws when membership lookup fails', async () => {
-    const supabase = createSupabaseMock({
-      groupResult: {
-        data: { id: 'group-1', owner_id: 'owner-1' },
+    const supabase = createAccessSupabaseMock({
+      ownerResult: {
+        data: null,
         error: null,
       },
       memberResult: {
@@ -148,7 +114,7 @@ describe('assertUserCanManageGroupBilling', () => {
       },
     })
 
-    await expect(assertUserCanManageGroupBilling(supabase, 'group-1', 'member-1')).rejects.toMatchObject({
+    await expect(assertUserCanAccessGroup(supabase, 'group-1', 'member-1')).rejects.toMatchObject({
       message: 'membership query failed',
     })
   })
@@ -219,9 +185,11 @@ function createPlanSyncSupabaseMock({
 function createStripeSubscription({
   status,
   currentPeriodEnd,
+  priceId = 'price_pro',
 }: {
   status: Stripe.Subscription.Status
   currentPeriodEnd: number
+  priceId?: string
 }) {
   return {
     id: 'sub_123',
@@ -229,13 +197,13 @@ function createStripeSubscription({
     customer: 'cus_123',
     cancel_at_period_end: false,
     metadata: {
-      group_id: 'group-1',
+      user_id: 'user-1',
     },
     items: {
       data: [
         {
           price: {
-            id: 'price_pro',
+            id: priceId,
           },
           current_period_start: currentPeriodEnd - 3600,
           current_period_end: currentPeriodEnd,
@@ -245,7 +213,7 @@ function createStripeSubscription({
   } as unknown as Stripe.Subscription
 }
 
-describe('syncGroupSubscriptionFromStripe', () => {
+describe('syncUserSubscriptionFromStripe', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.stubEnv('STRIPE_MAGIC_IMPORT_PRICE_ID', 'price_pro')
@@ -259,24 +227,27 @@ describe('syncGroupSubscriptionFromStripe', () => {
     })
     const { supabase, subscriptionsUpsertMock, rpcMock } = createPlanSyncSupabaseMock()
 
-    await syncGroupSubscriptionFromStripe(supabase, {
+    await syncUserSubscriptionFromStripe(supabase, {
       subscription,
-      groupId: 'group-1',
+      userId: 'user-1',
     })
 
     expect(subscriptionsUpsertMock).toHaveBeenCalledTimes(1)
     const subscriptionsUpsertPayload = subscriptionsUpsertMock.mock.calls[0]?.[0]
     expect(subscriptionsUpsertPayload).toMatchObject({
-      group_id: 'group-1',
+      user_id: 'user-1',
       status: 'canceled',
       grace_until: null,
     })
 
-    expect(rpcMock).toHaveBeenCalledWith('sync_group_import_account_for_plan', expect.objectContaining({
-      p_group_id: 'group-1',
-      p_plan_tier: 'free',
-      p_preserve_current_period_allocation: false,
-    }))
+    expect(rpcMock).toHaveBeenCalledWith(
+      'sync_user_import_account_for_plan',
+      expect.objectContaining({
+        p_user_id: 'user-1',
+        p_plan_tier: 'free',
+        p_preserve_current_period_allocation: false,
+      }),
+    )
   })
 
   it('keeps paid plan during grace for past_due subscriptions', async () => {
@@ -287,23 +258,190 @@ describe('syncGroupSubscriptionFromStripe', () => {
     })
     const { supabase, subscriptionsUpsertMock, rpcMock } = createPlanSyncSupabaseMock()
 
-    await syncGroupSubscriptionFromStripe(supabase, {
+    await syncUserSubscriptionFromStripe(supabase, {
       subscription,
-      groupId: 'group-1',
+      userId: 'user-1',
     })
 
     expect(subscriptionsUpsertMock).toHaveBeenCalledTimes(1)
     const subscriptionsUpsertPayload = subscriptionsUpsertMock.mock.calls[0]?.[0]
     expect(subscriptionsUpsertPayload).toMatchObject({
-      group_id: 'group-1',
+      user_id: 'user-1',
       status: 'past_due',
     })
     expect(subscriptionsUpsertPayload.grace_until).toEqual(expect.any(String))
 
-    expect(rpcMock).toHaveBeenCalledWith('sync_group_import_account_for_plan', expect.objectContaining({
-      p_group_id: 'group-1',
-      p_plan_tier: 'pro',
-      p_preserve_current_period_allocation: true,
-    }))
+    expect(rpcMock).toHaveBeenCalledWith(
+      'sync_user_import_account_for_plan',
+      expect.objectContaining({
+        p_user_id: 'user-1',
+        p_plan_tier: 'pro',
+        p_preserve_current_period_allocation: true,
+      }),
+    )
+  })
+
+  it('treats active subscriptions as pro even when Stripe price id does not match env', async () => {
+    const currentPeriodEnd = Math.floor(Date.now() / 1000) + 60 * 60
+    const subscription = createStripeSubscription({
+      status: 'active',
+      currentPeriodEnd,
+      priceId: 'price_legacy_pro',
+    })
+    const { supabase, rpcMock } = createPlanSyncSupabaseMock()
+
+    await syncUserSubscriptionFromStripe(supabase, {
+      subscription,
+      userId: 'user-1',
+    })
+
+    expect(rpcMock).toHaveBeenCalledWith(
+      'sync_user_import_account_for_plan',
+      expect.objectContaining({
+        p_user_id: 'user-1',
+        p_plan_tier: 'pro',
+        p_preserve_current_period_allocation: true,
+      }),
+    )
+  })
+
+  it('falls back to table sync when rpc hits account_id ambiguity', async () => {
+    const currentPeriodEnd = Math.floor(Date.now() / 1000) + 60 * 60
+    const subscription = createStripeSubscription({
+      status: 'active',
+      currentPeriodEnd,
+    })
+
+    const planSelectSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'plan-pro',
+        code: 'pro',
+        monthly_credits: 400,
+      },
+      error: null,
+    })
+    const planSelectMock = vi.fn().mockReturnValue({
+      single: planSelectSingleMock,
+    })
+    const plansUpsertMock = vi.fn().mockReturnValue({
+      select: planSelectMock,
+    })
+
+    const subscriptionsUpsertMock = vi.fn().mockResolvedValue({
+      error: null,
+    })
+
+    const importAccountsSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'account-1',
+        plan_tier: 'pro',
+        monthly_credits: 400,
+      },
+      error: null,
+    })
+    const importAccountsSelectMock = vi.fn().mockReturnValue({
+      single: importAccountsSingleMock,
+    })
+    const importAccountsUpsertMock = vi.fn().mockReturnValue({
+      select: importAccountsSelectMock,
+    })
+
+    const ledgerInsertMock = vi.fn().mockResolvedValue({
+      error: null,
+    })
+    const ledgerMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        credits_delta: 120,
+      },
+      error: null,
+    })
+    const ledgerSelectMatchMock = vi.fn().mockReturnValue({
+      maybeSingle: ledgerMaybeSingleMock,
+    })
+    const ledgerSelectMock = vi.fn().mockReturnValue({
+      match: ledgerSelectMatchMock,
+    })
+    const ledgerUpdateMatchMock = vi.fn().mockResolvedValue({
+      error: null,
+    })
+    const ledgerUpdateMock = vi.fn().mockReturnValue({
+      match: ledgerUpdateMatchMock,
+    })
+
+    const rpcMock = vi.fn().mockResolvedValue({
+      error: {
+        message: 'column reference "account_id" is ambiguous',
+      },
+    })
+
+    const supabase = {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'plans') {
+          return {
+            upsert: plansUpsertMock,
+          }
+        }
+
+        if (table === 'subscriptions') {
+          return {
+            upsert: subscriptionsUpsertMock,
+          }
+        }
+
+        if (table === 'import_credit_accounts') {
+          return {
+            upsert: importAccountsUpsertMock,
+          }
+        }
+
+        if (table === 'import_credit_ledger') {
+          return {
+            insert: ledgerInsertMock,
+            select: ledgerSelectMock,
+            update: ledgerUpdateMock,
+          }
+        }
+
+        throw new Error(`Unexpected table: ${table}`)
+      }),
+      rpc: rpcMock,
+    }
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await syncUserSubscriptionFromStripe(supabase as never, {
+      subscription,
+      userId: 'user-1',
+    })
+
+    expect(rpcMock).toHaveBeenCalledWith(
+      'sync_user_import_account_for_plan',
+      expect.objectContaining({
+        p_user_id: 'user-1',
+        p_plan_tier: 'pro',
+      }),
+    )
+    expect(importAccountsUpsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'user-1',
+        plan_tier: 'pro',
+        monthly_credits: 400,
+      }),
+      { onConflict: 'user_id' },
+    )
+    expect(ledgerInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account_id: 'account-1',
+        entry_type: 'monthly_allocation',
+      }),
+    )
+    expect(ledgerUpdateMatchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        account_id: 'account-1',
+        entry_type: 'monthly_allocation',
+      }),
+    )
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
 })

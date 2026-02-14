@@ -5,7 +5,6 @@ import { z } from 'zod'
 import { isStripeBillingConfigured } from '@/lib/billing/config'
 import {
   assertUserCanAccessGroup,
-  assertUserCanManageGroupBilling,
   getMagicImportEntitlementStatus,
 } from '@/lib/billing/server'
 import { getSourceCreditCost } from '@/lib/recipe-import/usage'
@@ -14,7 +13,7 @@ import { importSourceTypeSchema } from '@/lib/recipe-import/schema'
 export const runtime = 'nodejs'
 
 const requestSchema = z.object({
-  groupId: z.string().uuid(),
+  groupId: z.string().uuid().optional(),
   sourceType: importSourceTypeSchema.default('url'),
 })
 
@@ -23,7 +22,7 @@ type RouteCookiesGetter = () => Promise<Awaited<ReturnType<typeof cookies>>>
 export async function GET(request: NextRequest) {
   try {
     const parsed = requestSchema.parse({
-      groupId: request.nextUrl.searchParams.get('groupId'),
+      groupId: request.nextUrl.searchParams.get('groupId') ?? undefined,
       sourceType: request.nextUrl.searchParams.get('sourceType') ?? 'url',
     })
 
@@ -43,20 +42,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized', code: 'unauthorized' }, { status: 401 })
     }
 
-    const hasAccess = await assertUserCanAccessGroup(supabase, parsed.groupId, session.user.id)
-    if (!hasAccess) {
-      return NextResponse.json(
-        {
-          error: 'Forbidden: you do not have access to this group.',
-          code: 'forbidden',
-        },
-        { status: 403 },
-      )
+    if (parsed.groupId) {
+      const hasAccess = await assertUserCanAccessGroup(supabase, parsed.groupId, session.user.id)
+      if (!hasAccess) {
+        return NextResponse.json(
+          {
+            error: 'Forbidden: you do not have access to this group.',
+            code: 'forbidden',
+          },
+          { status: 403 },
+        )
+      }
     }
 
-    const canManage = Boolean(await assertUserCanManageGroupBilling(supabase, parsed.groupId, session.user.id))
     const entitlement = await getMagicImportEntitlementStatus(supabase, {
-      groupId: parsed.groupId,
       sourceType: parsed.sourceType,
       userId: session.user.id,
       userEmail: session.user.email,
@@ -82,7 +81,7 @@ export async function GET(request: NextRequest) {
       },
       billing: {
         stripeConfigured: isStripeBillingConfigured(),
-        canManage,
+        canManage: true,
       },
     })
   } catch {

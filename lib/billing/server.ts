@@ -3,7 +3,7 @@ import 'server-only'
 import type Stripe from 'stripe'
 import type { NextRequest } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getGroupMagicImportStatus } from '@/lib/recipe-import/usage'
+import { getUserMagicImportStatus } from '@/lib/recipe-import/usage'
 import type { ImportSourceType } from '@/lib/recipe-import/types'
 import {
   getBillingGraceHours,
@@ -15,11 +15,6 @@ import {
 } from './config'
 import { isMagicImportOverrideUser } from './override'
 
-type GroupRow = {
-  id: string
-  owner_id: string
-}
-
 type PlanRow = {
   id: string
   code: string
@@ -29,6 +24,16 @@ type PlanRow = {
 type SubscriptionLookupRow = {
   id: string
   provider_subscription_id: string | null
+}
+
+type ImportCreditAccountRow = {
+  id: string
+  plan_tier: string
+  monthly_credits: number
+}
+
+type ImportCreditLedgerAllocationRow = {
+  credits_delta: number | null
 }
 
 export type MagicImportEntitlementStatus = {
@@ -97,45 +102,20 @@ export async function assertUserCanAccessGroup(
   return Boolean(ownerRow || memberRow)
 }
 
-export async function assertUserCanManageGroupBilling(
-  supabase: SupabaseClient,
-  groupId: string,
-  userId: string,
-): Promise<GroupRow | null> {
-  const [{ data: group, error: groupError }, { data: membership, error: membershipError }] = await Promise.all([
-    supabase.from('groups').select('id, owner_id').eq('id', groupId).maybeSingle<GroupRow>(),
-    supabase
-      .from('group_members')
-      .select('group_id')
-      .eq('group_id', groupId)
-      .eq('user_id', userId)
-      .maybeSingle(),
-  ])
-
-  if (groupError) throw groupError
-  if (membershipError) throw membershipError
-  if (!group) return null
-  if (group.owner_id !== userId && !membership) return null
-
-  return group
-}
-
 export async function getMagicImportEntitlementStatus(
   supabase: SupabaseClient,
   {
-    groupId,
     sourceType,
     userId,
     userEmail,
   }: {
-    groupId: string
     sourceType: ImportSourceType
     userId: string
     userEmail?: string | null
   },
 ): Promise<MagicImportEntitlementStatus> {
-  const status = await getGroupMagicImportStatus(supabase, {
-    groupId,
+  const status = await getUserMagicImportStatus(supabase, {
+    userId,
     sourceType,
   })
 
@@ -205,6 +185,30 @@ function shouldApplyPaidPlan(input: {
   return Number.isFinite(graceUntilMs) && graceUntilMs > Date.now()
 }
 
+function isStripeSubscriptionStatusPaid(subscriptionStatus: string) {
+  return (
+    subscriptionStatus === 'active' ||
+    subscriptionStatus === 'trialing' ||
+    subscriptionStatus === 'past_due' ||
+    subscriptionStatus === 'unpaid'
+  )
+}
+
+function isKnownSyncUserImportAccountConflict(message: string | undefined) {
+  if (!message) return false
+  return message.toLowerCase().includes('column reference "account_id" is ambiguous')
+}
+
+function getCurrentMonthStartDateUtc() {
+  const now = new Date()
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  return monthStart.toISOString().slice(0, 10)
+}
+
+function isUniqueViolation(error: { code?: string } | null | undefined) {
+  return error?.code === '23505'
+}
+
 async function upsertPlanForCode(
   supabaseAdmin: SupabaseClient,
   {
@@ -245,42 +249,152 @@ async function upsertPlanForCode(
   return data
 }
 
-async function syncCreditAccountForPlan(
+async function syncCreditAccountForPlanFallback(
   supabaseAdmin: SupabaseClient,
   {
-    groupId,
+    userId,
     planTier,
     monthlyCredits,
     preserveCurrentPeriodAllocation,
   }: {
-    groupId: string
+    userId: string
     planTier: string
     monthlyCredits: number
     preserveCurrentPeriodAllocation: boolean
   },
 ) {
-  const { error } = await supabaseAdmin.rpc('sync_group_import_account_for_plan', {
-    p_group_id: groupId,
+  const nowIso = new Date().toISOString()
+  const normalizedPlanTier = planTier.trim() || 'free'
+  const { data: account, error: accountError } = await supabaseAdmin
+    .from('import_credit_accounts')
+    .upsert(
+      {
+        scope_type: 'user',
+        user_id: userId,
+        plan_tier: normalizedPlanTier,
+        monthly_credits: monthlyCredits,
+        updated_at: nowIso,
+      },
+      {
+        onConflict: 'user_id',
+      },
+    )
+    .select('id, plan_tier, monthly_credits')
+    .single<ImportCreditAccountRow>()
+
+  if (accountError) {
+    throw new Error(accountError.message || 'Unable to upsert import credit account for billing plan.')
+  }
+
+  const periodStart = getCurrentMonthStartDateUtc()
+  const metadata = {
+    plan_tier: account.plan_tier,
+    synced_at: nowIso,
+  }
+
+  const { error: insertAllocationError } = await supabaseAdmin.from('import_credit_ledger').insert({
+    account_id: account.id,
+    period_start: periodStart,
+    entry_type: 'monthly_allocation',
+    credits_delta: account.monthly_credits,
+    metadata,
+  })
+
+  if (insertAllocationError && !isUniqueViolation(insertAllocationError)) {
+    throw new Error(insertAllocationError.message || 'Unable to insert monthly allocation ledger entry.')
+  }
+
+  let targetCredits = account.monthly_credits
+  if (preserveCurrentPeriodAllocation) {
+    const { data: existingAllocation, error: allocationLookupError } = await supabaseAdmin
+      .from('import_credit_ledger')
+      .select('credits_delta')
+      .match({
+        account_id: account.id,
+        period_start: periodStart,
+        entry_type: 'monthly_allocation',
+      })
+      .maybeSingle<ImportCreditLedgerAllocationRow>()
+
+    if (allocationLookupError) {
+      throw new Error(allocationLookupError.message || 'Unable to read current monthly allocation.')
+    }
+
+    targetCredits = Math.max(existingAllocation?.credits_delta ?? 0, account.monthly_credits)
+  }
+
+  const { error: updateAllocationError } = await supabaseAdmin
+    .from('import_credit_ledger')
+    .update({
+      credits_delta: targetCredits,
+      metadata,
+    })
+    .match({
+      account_id: account.id,
+      period_start: periodStart,
+      entry_type: 'monthly_allocation',
+    })
+
+  if (updateAllocationError) {
+    throw new Error(updateAllocationError.message || 'Unable to update monthly allocation ledger entry.')
+  }
+}
+
+async function syncCreditAccountForPlan(
+  supabaseAdmin: SupabaseClient,
+  {
+    userId,
+    planTier,
+    monthlyCredits,
+    preserveCurrentPeriodAllocation,
+  }: {
+    userId: string
+    planTier: string
+    monthlyCredits: number
+    preserveCurrentPeriodAllocation: boolean
+  },
+) {
+  const { error } = await supabaseAdmin.rpc('sync_user_import_account_for_plan', {
+    p_user_id: userId,
     p_plan_tier: planTier,
     p_monthly_credits: monthlyCredits,
     p_preserve_current_period_allocation: preserveCurrentPeriodAllocation,
   })
 
-  if (error) {
+  if (!error) {
+    return
+  }
+
+  if (!isKnownSyncUserImportAccountConflict(error.message)) {
     throw new Error(error.message || 'Unable to sync import credit account for billing plan.')
   }
+
+  console.warn('[billing] sync_user_import_account_for_plan conflict detected, using fallback sync', {
+    userId,
+    planTier,
+    monthlyCredits,
+    preserveCurrentPeriodAllocation,
+    errorMessage: error.message,
+  })
+
+  await syncCreditAccountForPlanFallback(supabaseAdmin, {
+    userId,
+    planTier,
+    monthlyCredits,
+    preserveCurrentPeriodAllocation,
+  })
 }
 
-export async function syncGroupSubscriptionFromStripe(
+export async function syncUserSubscriptionFromStripe(
   supabaseAdmin: SupabaseClient,
   {
     subscription,
-    groupId,
+    userId,
     webhookEventId,
     webhookReceivedAt,
   }: {
     subscription: Stripe.Subscription
-    groupId: string
+    userId: string
     webhookEventId?: string | null
     webhookReceivedAt?: string | null
   },
@@ -288,7 +402,13 @@ export async function syncGroupSubscriptionFromStripe(
   const currentPriceId = subscription.items.data[0]?.price?.id ?? null
   const currentPeriodStart = subscription.items.data[0]?.current_period_start ?? null
   const currentPeriodEnd = subscription.items.data[0]?.current_period_end ?? null
-  const inferredPlanCode = resolvePlanCodeForStripePrice(currentPriceId)
+  const planCodeFromPrice = resolvePlanCodeForStripePrice(currentPriceId)
+  const inferredPlanCode =
+    planCodeFromPrice === 'pro'
+      ? 'pro'
+      : isStripeSubscriptionStatusPaid(subscription.status)
+        ? 'pro'
+        : 'free'
   const isPro = inferredPlanCode === 'pro'
 
   const plan = await upsertPlanForCode(supabaseAdmin, {
@@ -303,7 +423,7 @@ export async function syncGroupSubscriptionFromStripe(
   const nowIso = new Date().toISOString()
   const { error: upsertSubscriptionError } = await supabaseAdmin.from('subscriptions').upsert(
     {
-      group_id: groupId,
+      user_id: userId,
       plan_id: plan.id,
       provider: 'stripe',
       provider_customer_id: typeof subscription.customer === 'string' ? subscription.customer : null,
@@ -327,7 +447,7 @@ export async function syncGroupSubscriptionFromStripe(
       updated_at: nowIso,
     },
     {
-      onConflict: 'group_id,provider',
+      onConflict: 'user_id,provider',
     },
   )
 
@@ -342,23 +462,23 @@ export async function syncGroupSubscriptionFromStripe(
   })
 
   await syncCreditAccountForPlan(supabaseAdmin, {
-    groupId,
+    userId,
     planTier: applyPaidPlan ? inferredPlanCode : 'free',
     monthlyCredits: applyPaidPlan ? plan.monthly_credits : getFreeMonthlyCredits(),
     preserveCurrentPeriodAllocation: applyPaidPlan,
   })
 }
 
-export async function syncGroupSubscriptionByLookup(
+export async function syncUserSubscriptionByLookup(
   supabaseAdmin: SupabaseClient,
   {
     stripe,
-    groupId,
+    userId,
     webhookEventId,
     webhookReceivedAt,
   }: {
     stripe: Stripe
-    groupId: string
+    userId: string
     webhookEventId?: string | null
     webhookReceivedAt?: string | null
   },
@@ -366,7 +486,7 @@ export async function syncGroupSubscriptionByLookup(
   const { data, error } = await supabaseAdmin
     .from('subscriptions')
     .select('id, provider_subscription_id')
-    .eq('group_id', groupId)
+    .eq('user_id', userId)
     .eq('provider', 'stripe')
     .maybeSingle<SubscriptionLookupRow>()
 
@@ -380,9 +500,9 @@ export async function syncGroupSubscriptionByLookup(
 
   const subscription = await stripe.subscriptions.retrieve(data.provider_subscription_id)
 
-  await syncGroupSubscriptionFromStripe(supabaseAdmin, {
+  await syncUserSubscriptionFromStripe(supabaseAdmin, {
     subscription,
-    groupId,
+    userId,
     webhookEventId,
     webhookReceivedAt,
   })

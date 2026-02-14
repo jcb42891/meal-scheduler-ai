@@ -42,7 +42,7 @@ export type UsageEventInput = {
   metadata?: Record<string, unknown>
 }
 
-export type GroupCreditConsumptionResult = {
+export type UserCreditConsumptionResult = {
   allowed: boolean
   requiredCredits: number
   periodStart: string
@@ -52,7 +52,7 @@ export type GroupCreditConsumptionResult = {
   remainingCredits: number
 }
 
-type GroupMagicImportStatusRpcRow = {
+type UserMagicImportStatusRpcRow = {
   allowed: boolean | null
   reason_code: string | null
   plan_tier: string | null
@@ -66,7 +66,7 @@ type GroupMagicImportStatusRpcRow = {
   grace_active: boolean | null
 }
 
-export type GroupMagicImportStatus = {
+export type UserMagicImportStatus = {
   allowed: boolean
   reasonCode: string | null
   planTier: string
@@ -157,24 +157,24 @@ export async function recordImportUsageEvent(
   return eventId
 }
 
-export async function consumeGroupImportCredits(
+export async function consumeUserImportCredits(
   supabase: SupabaseClient,
   {
-    groupId,
+    userId,
     sourceType,
     requestId,
     usageEventId,
   }: {
-    groupId: string
+    userId: string
     sourceType: ImportSourceType
     requestId: string
     usageEventId?: number
   },
-): Promise<GroupCreditConsumptionResult> {
+): Promise<UserCreditConsumptionResult> {
   const defaultMonthlyCredits = getDefaultMonthlyCredits()
   const requestedCredits = getSourceCreditCost(sourceType)
-  const { data, error } = await supabase.rpc('consume_group_import_credits', {
-    p_group_id: groupId,
+  const { data, error } = await supabase.rpc('consume_user_import_credits', {
+    p_user_id: userId,
     p_source_type: sourceType,
     p_credits: requestedCredits,
     p_request_id: requestId,
@@ -202,20 +202,20 @@ export async function consumeGroupImportCredits(
   }
 }
 
-export async function getGroupMagicImportStatus(
+export async function getUserMagicImportStatus(
   supabase: SupabaseClient,
   {
-    groupId,
+    userId,
     sourceType,
   }: {
-    groupId: string
+    userId: string
     sourceType: ImportSourceType
   },
-): Promise<GroupMagicImportStatus> {
+): Promise<UserMagicImportStatus> {
   const defaultMonthlyCredits = getDefaultMonthlyCredits()
   const requiredCredits = getSourceCreditCost(sourceType)
-  const { data, error } = await supabase.rpc('get_group_magic_import_status', {
-    p_group_id: groupId,
+  const { data, error } = await supabase.rpc('get_user_magic_import_status', {
+    p_user_id: userId,
     p_source_type: sourceType,
     p_required_credits: requiredCredits,
     p_default_monthly_credits: defaultMonthlyCredits,
@@ -225,7 +225,7 @@ export async function getGroupMagicImportStatus(
     throw new Error(error.message || 'Unable to read import entitlement status.')
   }
 
-  const row = (Array.isArray(data) ? data[0] : data) as GroupMagicImportStatusRpcRow | null | undefined
+  const row = (Array.isArray(data) ? data[0] : data) as UserMagicImportStatusRpcRow | null | undefined
   if (!row || !row.period_start) {
     throw new Error('Import entitlement status returned an empty response.')
   }

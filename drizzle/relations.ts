@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { usersInAuth, staple_ingredients, groups, meals, meal_calendar, profiles, group_invitations, import_usage_events, import_credit_accounts, import_credit_ledger, subscriptions, plans, entitlements, credit_purchases, ingredients, meal_ingredients, group_members, import_rate_limits } from "./schema";
+import { usersInAuth, staple_ingredients, groups, meals, meal_calendar, profiles, group_invitations, import_usage_events, import_credit_accounts, import_credit_ledger, plans, subscriptions, entitlements, credit_purchases, ingredients, meal_ingredients, group_members, import_rate_limits } from "./schema";
 
 export const staple_ingredientsRelations = relations(staple_ingredients, ({one}) => ({
 	usersInAuth: one(usersInAuth, {
@@ -20,6 +20,7 @@ export const usersInAuthRelations = relations(usersInAuth, ({many}) => ({
 	group_invitations: many(group_invitations),
 	import_usage_events: many(import_usage_events),
 	import_credit_accounts: many(import_credit_accounts),
+	subscriptions: many(subscriptions),
 	entitlements: many(entitlements),
 	credit_purchases: many(credit_purchases),
 	import_rate_limits: many(import_rate_limits),
@@ -36,7 +37,6 @@ export const groupsRelations = relations(groups, ({one, many}) => ({
 	group_invitations: many(group_invitations),
 	import_usage_events: many(import_usage_events),
 	import_credit_accounts: many(import_credit_accounts),
-	subscriptions: many(subscriptions),
 	entitlements: many(entitlements),
 	credit_purchases: many(credit_purchases),
 	group_members: many(group_members),
@@ -122,13 +122,13 @@ export const import_credit_ledgerRelations = relations(import_credit_ledger, ({o
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({one, many}) => ({
-	group: one(groups, {
-		fields: [subscriptions.group_id],
-		references: [groups.id]
-	}),
 	plan: one(plans, {
 		fields: [subscriptions.plan_id],
 		references: [plans.id]
+	}),
+	usersInAuth: one(usersInAuth, {
+		fields: [subscriptions.user_id],
+		references: [usersInAuth.id]
 	}),
 	entitlements: many(entitlements),
 }));

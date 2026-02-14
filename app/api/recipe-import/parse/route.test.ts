@@ -4,14 +4,14 @@ const createRouteHandlerClientMock = vi.hoisted(() => vi.fn())
 const cookiesMock = vi.hoisted(() => vi.fn())
 const checkRecipeImportRateLimitMock = vi.hoisted(() => vi.fn())
 const recordImportUsageEventMock = vi.hoisted(() => vi.fn())
-const consumeGroupImportCreditsMock = vi.hoisted(() => vi.fn())
+const consumeUserImportCreditsMock = vi.hoisted(() => vi.fn())
 const fetchRecipeTextFromUrlMock = vi.hoisted(() => vi.fn())
 const parseRecipeWithOpenAIMock = vi.hoisted(() => vi.fn())
 const parseRecipeFromPlainTextFallbackMock = vi.hoisted(() => vi.fn())
 const normalizeParsedRecipeMock = vi.hoisted(() => vi.fn())
 const assertUserCanAccessGroupMock = vi.hoisted(() => vi.fn())
 const getMagicImportEntitlementStatusMock = vi.hoisted(() => vi.fn())
-const syncGroupSubscriptionByLookupMock = vi.hoisted(() => vi.fn())
+const syncUserSubscriptionByLookupMock = vi.hoisted(() => vi.fn())
 const isStripeBillingConfiguredMock = vi.hoisted(() => vi.fn())
 const createSupabaseAdminClientMock = vi.hoisted(() => vi.fn())
 const getStripeClientMock = vi.hoisted(() => vi.fn())
@@ -30,7 +30,7 @@ vi.mock('@/lib/recipe-import/rate-limit', () => ({
 
 vi.mock('@/lib/recipe-import/usage', () => ({
   recordImportUsageEvent: recordImportUsageEventMock,
-  consumeGroupImportCredits: consumeGroupImportCreditsMock,
+  consumeUserImportCredits: consumeUserImportCreditsMock,
 }))
 
 vi.mock('@/lib/recipe-import/url', () => ({
@@ -52,7 +52,7 @@ vi.mock('@/lib/recipe-import/normalize', () => ({
 vi.mock('@/lib/billing/server', () => ({
   assertUserCanAccessGroup: assertUserCanAccessGroupMock,
   getMagicImportEntitlementStatus: getMagicImportEntitlementStatusMock,
-  syncGroupSubscriptionByLookup: syncGroupSubscriptionByLookupMock,
+  syncUserSubscriptionByLookup: syncUserSubscriptionByLookupMock,
 }))
 
 vi.mock('@/lib/billing/config', () => ({
@@ -153,7 +153,7 @@ describe('POST /api/recipe-import/parse', () => {
       graceActive: false,
       isEnvOverride: false,
     })
-    syncGroupSubscriptionByLookupMock.mockResolvedValue(false)
+    syncUserSubscriptionByLookupMock.mockResolvedValue(false)
     isStripeBillingConfiguredMock.mockReturnValue(false)
     createSupabaseAdminClientMock.mockReturnValue({})
     getStripeClientMock.mockReturnValue({})
@@ -164,7 +164,7 @@ describe('POST /api/recipe-import/parse', () => {
       retryAfterSeconds: 1,
     })
     recordImportUsageEventMock.mockResolvedValue(123)
-    consumeGroupImportCreditsMock.mockResolvedValue({
+    consumeUserImportCreditsMock.mockResolvedValue({
       allowed: true,
       requiredCredits: 1,
       periodStart: '2026-02-01',
@@ -349,7 +349,7 @@ describe('POST /api/recipe-import/parse', () => {
       remainingCredits: 0,
       upgradeAvailable: false,
     })
-    expect(consumeGroupImportCreditsMock).not.toHaveBeenCalled()
+    expect(consumeUserImportCreditsMock).not.toHaveBeenCalled()
   })
 
   it('skips credit consumption when an unlimited override is active', async () => {
@@ -386,6 +386,6 @@ describe('POST /api/recipe-import/parse', () => {
         planTier: 'override',
       },
     })
-    expect(consumeGroupImportCreditsMock).not.toHaveBeenCalled()
+    expect(consumeUserImportCreditsMock).not.toHaveBeenCalled()
   })
 })

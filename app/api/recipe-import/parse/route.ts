@@ -10,7 +10,7 @@ import { parseRecipeWithOpenAI } from '@/lib/recipe-import/openai'
 import { parseRecipeFromPlainTextFallback } from '@/lib/recipe-import/fallback'
 import { normalizeParsedRecipe } from '@/lib/recipe-import/normalize'
 import { checkRecipeImportRateLimit } from '@/lib/recipe-import/rate-limit'
-import { consumeGroupImportCredits, recordImportUsageEvent } from '@/lib/recipe-import/usage'
+import { consumeUserImportCredits, recordImportUsageEvent } from '@/lib/recipe-import/usage'
 import type { ImportSourceType } from '@/lib/recipe-import/types'
 import { isStripeBillingConfigured } from '@/lib/billing/config'
 import { createSupabaseAdminClient } from '@/lib/billing/supabase-admin'
@@ -18,7 +18,7 @@ import { getStripeClient } from '@/lib/billing/stripe'
 import {
   assertUserCanAccessGroup,
   getMagicImportEntitlementStatus,
-  syncGroupSubscriptionByLookup,
+  syncUserSubscriptionByLookup,
 } from '@/lib/billing/server'
 
 export const runtime = 'nodejs'
@@ -282,7 +282,6 @@ export async function POST(req: NextRequest) {
     }
 
     let entitlementStatus = await getMagicImportEntitlementStatus(supabase, {
-      groupId,
       sourceType: input.sourceType,
       userId: session.user.id,
       userEmail: session.user.email,
@@ -292,14 +291,13 @@ export async function POST(req: NextRequest) {
       try {
         const supabaseAdmin = createSupabaseAdminClient()
         const stripe = getStripeClient()
-        const refreshed = await syncGroupSubscriptionByLookup(supabaseAdmin, {
+        const refreshed = await syncUserSubscriptionByLookup(supabaseAdmin, {
           stripe,
-          groupId,
+          userId: session.user.id,
         })
 
         if (refreshed) {
           entitlementStatus = await getMagicImportEntitlementStatus(supabase, {
-            groupId,
             sourceType: input.sourceType,
             userId: session.user.id,
             userEmail: session.user.email,
@@ -380,8 +378,8 @@ export async function POST(req: NextRequest) {
           usedCredits: entitlementStatus.usedCredits,
           remainingCredits: entitlementStatus.remainingCredits,
         }
-      : await consumeGroupImportCredits(supabase, {
-          groupId,
+      : await consumeUserImportCredits(supabase, {
+          userId: session.user.id,
           sourceType: input.sourceType,
           requestId: usageContext.requestId,
           usageEventId: usageContext.attemptEventId,

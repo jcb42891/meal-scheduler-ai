@@ -4,13 +4,11 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { createSupabaseAdminClient } from '@/lib/billing/supabase-admin'
 import { getStripeClient } from '@/lib/billing/stripe'
-import { assertUserCanManageGroupBilling, resolveBillingAppOrigin } from '@/lib/billing/server'
+import { resolveBillingAppOrigin } from '@/lib/billing/server'
 
 export const runtime = 'nodejs'
 
-const requestSchema = z.object({
-  groupId: z.string().uuid(),
-})
+const requestSchema = z.object({}).passthrough()
 
 type RouteCookiesGetter = () => Promise<Awaited<ReturnType<typeof cookies>>>
 
@@ -20,7 +18,7 @@ type ExistingSubscriptionRow = {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = requestSchema.parse(await request.json())
+    await requestSchema.parse(await request.json().catch(() => ({})))
 
     const cookieStore = await cookies()
     const compatibleCookieGetter = (() => cookieStore) as unknown as RouteCookiesGetter
@@ -38,22 +36,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized', code: 'unauthorized' }, { status: 401 })
     }
 
-    const group = await assertUserCanManageGroupBilling(supabase, body.groupId, session.user.id)
-    if (!group) {
-      return NextResponse.json(
-        {
-          error: 'You must be a member of this group to manage billing.',
-          code: 'forbidden',
-        },
-        { status: 403 },
-      )
-    }
-
     const supabaseAdmin = createSupabaseAdminClient()
     const { data: subscription, error: subscriptionLookupError } = await supabaseAdmin
       .from('subscriptions')
       .select('provider_customer_id')
-      .eq('group_id', body.groupId)
+      .eq('user_id', session.user.id)
       .eq('provider', 'stripe')
       .maybeSingle<ExistingSubscriptionRow>()
 
@@ -65,7 +52,7 @@ export async function POST(request: NextRequest) {
     if (!customerId) {
       return NextResponse.json(
         {
-          error: 'No Stripe billing profile exists for this group yet.',
+          error: 'No Stripe billing profile exists for this account yet.',
           code: 'billing_profile_missing',
         },
         { status: 409 },
@@ -76,7 +63,7 @@ export async function POST(request: NextRequest) {
     const appOrigin = resolveBillingAppOrigin(request)
     const sessionResult = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${appOrigin}/meals`,
+      return_url: `${appOrigin}/profile?tab=billing`,
     })
 
     return NextResponse.json({ url: sessionResult.url })

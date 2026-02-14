@@ -58,7 +58,7 @@ export function getRecipeImportParseErrorMessage(input: RecipeImportErrorInput):
   }
 
   if (input.code === 'quota_exceeded') {
-    return 'Magic Import credits are exhausted for this group. Upgrade billing or wait for the monthly reset.'
+    return 'Magic Import credits are exhausted for your account. Upgrade billing or wait for the monthly reset.'
   }
 
   if (input.status === 504 || input.code === 'timeout' || input.code === 'parse_timeout') {

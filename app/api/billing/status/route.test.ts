@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const createRouteHandlerClientMock = vi.hoisted(() => vi.fn())
 const cookiesMock = vi.hoisted(() => vi.fn())
 const assertUserCanAccessGroupMock = vi.hoisted(() => vi.fn())
-const assertUserCanManageGroupBillingMock = vi.hoisted(() => vi.fn())
 const getMagicImportEntitlementStatusMock = vi.hoisted(() => vi.fn())
 const isStripeBillingConfiguredMock = vi.hoisted(() => vi.fn())
 
@@ -17,7 +16,6 @@ vi.mock('next/headers', () => ({
 
 vi.mock('@/lib/billing/server', () => ({
   assertUserCanAccessGroup: assertUserCanAccessGroupMock,
-  assertUserCanManageGroupBilling: assertUserCanManageGroupBillingMock,
   getMagicImportEntitlementStatus: getMagicImportEntitlementStatusMock,
 }))
 
@@ -25,7 +23,12 @@ vi.mock('@/lib/billing/config', () => ({
   isStripeBillingConfigured: isStripeBillingConfiguredMock,
 }))
 
-function createSupabaseMock(sessionUser: { id: string; email?: string | null } | null = { id: 'user-1', email: 'user@example.com' }) {
+function createSupabaseMock(
+  sessionUser: { id: string; email?: string | null } | null = {
+    id: 'user-1',
+    email: 'user@example.com',
+  },
+) {
   return {
     auth: {
       getSession: vi.fn().mockResolvedValue({
@@ -49,7 +52,6 @@ describe('GET /api/billing/status', () => {
     vi.resetAllMocks()
     cookiesMock.mockResolvedValue({})
     assertUserCanAccessGroupMock.mockResolvedValue(true)
-    assertUserCanManageGroupBillingMock.mockResolvedValue({ id: 'group-1', owner_id: 'user-1' })
     getMagicImportEntitlementStatusMock.mockResolvedValue({
       allowed: true,
       reasonCode: null,
@@ -71,28 +73,30 @@ describe('GET /api/billing/status', () => {
     createRouteHandlerClientMock.mockReturnValue(createSupabaseMock(null))
 
     const { GET } = await import('./route')
-    const response = await GET(makeRequest('http://localhost/api/billing/status?groupId=11111111-1111-4111-8111-111111111111&sourceType=url'))
+    const response = await GET(makeRequest('http://localhost/api/billing/status?sourceType=url'))
 
     expect(response.status).toBe(401)
     await expect(response.json()).resolves.toMatchObject({ code: 'unauthorized' })
   })
 
-  it('returns 403 for inaccessible groups', async () => {
+  it('returns 403 when group context is provided but inaccessible', async () => {
     createRouteHandlerClientMock.mockReturnValue(createSupabaseMock())
     assertUserCanAccessGroupMock.mockResolvedValue(false)
 
     const { GET } = await import('./route')
-    const response = await GET(makeRequest('http://localhost/api/billing/status?groupId=11111111-1111-4111-8111-111111111111&sourceType=url'))
+    const response = await GET(
+      makeRequest('http://localhost/api/billing/status?groupId=11111111-1111-4111-8111-111111111111&sourceType=url'),
+    )
 
     expect(response.status).toBe(403)
     await expect(response.json()).resolves.toMatchObject({ code: 'forbidden' })
   })
 
-  it('returns entitlement status and billing flags', async () => {
+  it('returns account-level entitlement status without groupId', async () => {
     createRouteHandlerClientMock.mockReturnValue(createSupabaseMock())
 
     const { GET } = await import('./route')
-    const response = await GET(makeRequest('http://localhost/api/billing/status?groupId=11111111-1111-4111-8111-111111111111&sourceType=image'))
+    const response = await GET(makeRequest('http://localhost/api/billing/status?sourceType=image'))
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
@@ -108,5 +112,13 @@ describe('GET /api/billing/status', () => {
         canManage: true,
       },
     })
+    expect(assertUserCanAccessGroupMock).not.toHaveBeenCalled()
+    expect(getMagicImportEntitlementStatusMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'user-1',
+        sourceType: 'image',
+      }),
+    )
   })
 })
