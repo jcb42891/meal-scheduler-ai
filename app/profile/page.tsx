@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/lib/contexts/AuthContext'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +41,14 @@ type BillingStatusResponse = {
 type ProfileTab = 'billing' | 'account'
 
 export default function ProfilePage() {
+  return (
+    <Suspense fallback={<div className="space-y-5" />}>
+      <ProfilePageContent />
+    </Suspense>
+  )
+}
+
+function ProfilePageContent() {
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
