@@ -1,5 +1,14 @@
-import { pgTable, foreignKey, unique, pgPolicy, uuid, text, numeric, timestamp, boolean, date, index, uniqueIndex, check, bigserial, integer, jsonb, bigint, primaryKey, pgView } from "drizzle-orm/pg-core"
+import { pgTable, pgSchema, foreignKey, unique, pgPolicy, uuid, text, numeric, timestamp, boolean, date, index, uniqueIndex, check, bigserial, integer, jsonb, bigint, primaryKey, pgView } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
+
+
+const auth = pgSchema("auth");
+
+export const usersInAuth = auth.table("users", {
+	id: uuid("id").notNull(),
+});
+
+export const users = usersInAuth;
 
 
 
