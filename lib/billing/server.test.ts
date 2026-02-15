@@ -127,7 +127,7 @@ type PlanSyncMock = {
 }
 
 function createPlanSyncSupabaseMock({
-  planMonthlyCredits = 400,
+  planMonthlyCredits = 300,
 }: {
   planMonthlyCredits?: number
 } = {}): PlanSyncMock {
@@ -316,7 +316,7 @@ describe('syncUserSubscriptionFromStripe', () => {
       data: {
         id: 'plan-pro',
         code: 'pro',
-        monthly_credits: 400,
+        monthly_credits: 300,
       },
       error: null,
     })
@@ -335,7 +335,7 @@ describe('syncUserSubscriptionFromStripe', () => {
       data: {
         id: 'account-1',
         plan_tier: 'pro',
-        monthly_credits: 400,
+        monthly_credits: 300,
       },
       error: null,
     })
@@ -425,7 +425,7 @@ describe('syncUserSubscriptionFromStripe', () => {
       expect.objectContaining({
         user_id: 'user-1',
         plan_tier: 'pro',
-        monthly_credits: 400,
+        monthly_credits: 300,
       }),
       { onConflict: 'user_id' },
     )

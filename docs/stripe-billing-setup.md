@@ -18,7 +18,7 @@ Set these on your app/server runtime:
 
 Optional tuning:
 
-- `STRIPE_MAGIC_IMPORT_MONTHLY_CREDITS` (default: `400`)
+- `STRIPE_MAGIC_IMPORT_MONTHLY_CREDITS` (default: `300`)
 - `STRIPE_MAGIC_IMPORT_PRODUCT_NAME` (default: `Magic Import Pro`)
 - `BILLING_GRACE_HOURS` (default: `72`)
 - `BILLING_APP_ORIGIN` (force redirect origin for checkout/portal)

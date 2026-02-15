@@ -1,6 +1,6 @@
 import { getDefaultMonthlyCredits } from '@/lib/recipe-import/usage'
 
-const DEFAULT_PRO_MONTHLY_CREDITS = 400
+const DEFAULT_PRO_MONTHLY_CREDITS = 300
 const DEFAULT_GRACE_HOURS = 72
 
 function parseNonNegativeInt(value: string | undefined, fallback: number) {

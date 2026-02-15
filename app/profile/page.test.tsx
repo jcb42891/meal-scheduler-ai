@@ -117,7 +117,11 @@ describe('ProfilePage', () => {
     })
 
     expect(screen.getByText('Billing Command Center')).toBeInTheDocument()
-    expect(screen.getByText('Track account credits, manage your plan, and upgrade in one place.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Pro gives you a higher monthly Magic Import credit pool and fewer workflow interruptions.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Why people choose Pro')).toBeInTheDocument()
+    expect(screen.getByText('Fewer blocked import sessions')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Upgrade to Pro' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reset Password' })).not.toBeInTheDocument()
   })
@@ -131,7 +135,9 @@ describe('ProfilePage', () => {
     })
 
     expect(screen.getByRole('heading', { name: 'Account Details' })).toBeInTheDocument()
-    expect(screen.queryByText('Track account credits, manage your plan, and upgrade in one place.')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Pro gives you a higher monthly Magic Import credit pool and fewer workflow interruptions.'),
+    ).not.toBeInTheDocument()
   })
 
   it('shows account-level blocked copy when credits are exhausted', async () => {
@@ -160,7 +166,9 @@ describe('ProfilePage', () => {
     render(<ProfilePage />)
 
     expect(
-      await screen.findByText('Magic Import is currently blocked for your account. Upgrading to Pro restores access.'),
+      await screen.findByText(
+        'Magic Import is currently blocked for your account. Upgrading to Pro gives you a higher monthly credit pool and restores import access.',
+      ),
     ).toBeInTheDocument()
   })
 })

@@ -24,6 +24,7 @@ import {
 export const runtime = 'nodejs'
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
+const MAX_TEXT_CHARS = 20_000
 const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
 const PARSE_TIMEOUT_MS = 25_000
 
@@ -341,6 +342,18 @@ export async function POST(req: NextRequest) {
         throw new HttpError('Recipe text is required for text import.', 400, {
           code: 'missing_text',
         })
+      }
+      if (rawText.length > MAX_TEXT_CHARS) {
+        throw new HttpError(
+          `Recipe text exceeds the ${MAX_TEXT_CHARS.toLocaleString()} character limit. Shorten the text or import from URL/image.`,
+          400,
+          {
+            code: 'text_too_large',
+            details: {
+              maxChars: MAX_TEXT_CHARS,
+            },
+          },
+        )
       }
       sourceText = rawText
       usageContext.inputBytes = Buffer.byteLength(rawText, 'utf8')

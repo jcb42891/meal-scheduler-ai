@@ -268,9 +268,9 @@ function ProfilePageContent() {
                     Billing Command Center
                   </span>
                   <div className="space-y-1">
-                    <h2 className="text-xl font-semibold text-amber-950 sm:text-2xl">Keep recipe magic flowing</h2>
+                    <h2 className="text-xl font-semibold text-amber-950 sm:text-2xl">Upgrade once, import more recipes</h2>
                     <p className="text-sm text-amber-900/80">
-                      Track account credits, manage your plan, and upgrade in one place.
+                      Pro gives you a higher monthly Magic Import credit pool and fewer workflow interruptions.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs font-semibold text-amber-900/85">
@@ -297,46 +297,83 @@ function ProfilePageContent() {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3">
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">Billing Actions</p>
-                  <div className="flex min-h-10 flex-wrap items-center gap-2">
-                    {isBillingStatusLoading ? (
-                      <Button type="button" variant="outline" disabled>
-                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                        Loading billing status...
-                      </Button>
-                    ) : billingStatus && billingStatus.billing.stripeConfigured && billingStatus.billing.canManage ? (
-                      <>
-                        {billingCtas.showUpgrade && (
-                          <Button
-                            type="button"
-                            onClick={() => startBillingRedirect('/api/billing/checkout')}
-                            disabled={isCheckoutLoading}
-                            className="h-10 bg-gradient-to-r from-amber-500 to-rose-500 text-white hover:brightness-105"
-                          >
-                            {isCheckoutLoading ? 'Opening Stripe...' : 'Upgrade to Pro'}
-                          </Button>
-                        )}
-                        {billingCtas.showManage && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => startBillingRedirect('/api/billing/portal')}
-                            disabled={isPortalLoading}
-                          >
-                            {isPortalLoading ? 'Opening portal...' : 'Manage Billing'}
-                          </Button>
-                        )}
-                      </>
-                    ) : null}
+              <div className="mt-5 rounded-xl border border-amber-300/70 bg-white/80 p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">Why people choose Pro</p>
+                    <h3 className="text-base font-semibold text-amber-950 sm:text-lg">
+                      Keep recipe import fast, predictable, and always available
+                    </h3>
+                    <p className="text-sm text-amber-900/80">
+                      Pro is built for members who import recipes every week and do not want planning sessions blocked
+                      by quota limits.
+                    </p>
                   </div>
 
-                  {billingStatus && !billingStatus.billing.stripeConfigured ? (
-                    <p className="text-xs text-amber-900/80">Stripe billing is not configured yet.</p>
-                  ) : billingStatus && !billingStatus.billing.canManage ? (
-                    <p className="text-xs text-amber-900/80">Billing is unavailable for this account.</p>
-                  ) : null}
+                  <div className="space-y-2 lg:w-full lg:max-w-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">Billing Actions</p>
+                    <div className="flex min-h-10 flex-wrap items-center gap-2">
+                      {isBillingStatusLoading ? (
+                        <Button type="button" variant="outline" disabled>
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                          Loading billing status...
+                        </Button>
+                      ) : billingStatus && billingStatus.billing.stripeConfigured && billingStatus.billing.canManage ? (
+                        <>
+                          {billingCtas.showUpgrade && (
+                            <Button
+                              type="button"
+                              onClick={() => startBillingRedirect('/api/billing/checkout')}
+                              disabled={isCheckoutLoading}
+                              className="h-10 bg-gradient-to-r from-amber-500 to-rose-500 text-white hover:brightness-105"
+                            >
+                              {isCheckoutLoading ? 'Opening Stripe...' : 'Upgrade to Pro'}
+                            </Button>
+                          )}
+                          {billingCtas.showManage && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => startBillingRedirect('/api/billing/portal')}
+                              disabled={isPortalLoading}
+                            >
+                              {isPortalLoading ? 'Opening portal...' : 'Manage Billing'}
+                            </Button>
+                          )}
+                        </>
+                      ) : null}
+                    </div>
+
+                    {billingStatus && !billingStatus.billing.stripeConfigured ? (
+                      <p className="text-xs text-amber-900/80">Stripe billing is not configured yet.</p>
+                    ) : billingStatus && !billingStatus.billing.canManage ? (
+                      <p className="text-xs text-amber-900/80">Billing is unavailable for this account.</p>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-lg border border-amber-200/70 bg-amber-50/60 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">Import Budget</p>
+                    <p className="mt-1 text-sm font-semibold text-amber-950">Larger monthly Magic Import allowance</p>
+                    <p className="mt-1 text-xs text-amber-900/80">
+                      Built for URL, screenshot, and text imports throughout the month.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-amber-200/70 bg-amber-50/60 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">Consistency</p>
+                    <p className="mt-1 text-sm font-semibold text-amber-950">Fewer blocked import sessions</p>
+                    <p className="mt-1 text-xs text-amber-900/80">
+                      Keep planning flow steady instead of waiting for the next monthly reset.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-amber-200/70 bg-amber-50/60 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">Meal Library Growth</p>
+                    <p className="mt-1 text-sm font-semibold text-amber-950">Turn raw recipes into saved meals faster</p>
+                    <p className="mt-1 text-xs text-amber-900/80">
+                      Spend less time retyping ingredients and steps across your household plans.
+                    </p>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -388,7 +425,8 @@ function ProfilePageContent() {
 
                   {billingCtas.showBlockedNotice && (
                     <p className="rounded-md border border-amber-300/70 bg-amber-100/60 px-3 py-2 text-sm text-amber-900">
-                      Magic Import is currently blocked for your account. Upgrading to Pro restores access.
+                      Magic Import is currently blocked for your account. Upgrading to Pro gives you a higher monthly
+                      credit pool and restores import access.
                     </p>
                   )}
                 </>

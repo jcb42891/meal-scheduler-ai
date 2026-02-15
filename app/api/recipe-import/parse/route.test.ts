@@ -287,6 +287,27 @@ describe('POST /api/recipe-import/parse', () => {
     )
   })
 
+  it('returns 400 when pasted text exceeds the max character limit', async () => {
+    const { supabase } = createSupabaseMock()
+    createRouteHandlerClientMock.mockReturnValue(supabase)
+
+    const { POST } = await import('./route')
+    const response = await POST(
+      makeJsonRequest({
+        groupId,
+        sourceType: 'text',
+        text: 'a'.repeat(20_001),
+      }) as never,
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'text_too_large',
+      maxChars: 20_000,
+    })
+    expect(recordImportUsageEventMock).toHaveBeenCalledTimes(2)
+  })
+
   it('returns 429 with retry header when rate limit is exceeded', async () => {
     const { supabase } = createSupabaseMock()
     createRouteHandlerClientMock.mockReturnValue(supabase)

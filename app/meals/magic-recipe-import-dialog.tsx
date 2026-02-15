@@ -660,9 +660,22 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
                       <div className="space-y-2 rounded-[8px] border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-950 dark:text-amber-100">
                         {billingCtas.showBlockedNotice ? (
                           <p>Magic Import credits are exhausted for your account.</p>
-                        ) : (
-                          <p>Upgrade to Pro for more monthly Magic Import credits.</p>
-                        )}
+                        ) : billingCtas.showUpgrade ? (
+                          <p>Upgrade to Pro to unlock a larger monthly Magic Import allowance.</p>
+                        ) : null}
+                        {billingCtas.showUpgrade ? (
+                          <div className="grid gap-1.5 sm:grid-cols-3 text-[11px]">
+                            <div className="rounded-md border border-amber-400/50 bg-white/70 px-2 py-1.5 font-medium text-amber-950">
+                              More monthly credits
+                            </div>
+                            <div className="rounded-md border border-amber-400/50 bg-white/70 px-2 py-1.5 font-medium text-amber-950">
+                              Fewer blocked imports
+                            </div>
+                            <div className="rounded-md border border-amber-400/50 bg-white/70 px-2 py-1.5 font-medium text-amber-950">
+                              Faster library growth
+                            </div>
+                          </div>
+                        ) : null}
                         <div className="flex flex-wrap gap-2">
                           {billingCtas.showUpgrade && (
                             <Button
@@ -671,7 +684,7 @@ export function MagicRecipeImportDialog({ open, onOpenChange, groupId, onMealImp
                               onClick={() => startBillingRedirect('/api/billing/checkout')}
                               disabled={isCheckoutLoading}
                             >
-                              {isCheckoutLoading ? 'Opening Stripe...' : 'Upgrade with Stripe'}
+                              {isCheckoutLoading ? 'Opening Stripe...' : 'Upgrade to Pro'}
                             </Button>
                           )}
                           {billingCtas.showManage && (
